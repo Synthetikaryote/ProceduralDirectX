@@ -251,6 +251,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// Clear the depth buffer.
 			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+			// game rendering goes here
+
 			// Present the back buffer to the screen since rendering is complete.
 			swapChain->Present(vsync ? 1 : 0, 0);
 		}
