@@ -141,7 +141,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11Device* device = nullptr;
 	ID3D11DeviceContext* context = nullptr;
 	D3D_FEATURE_LEVEL featureLevels[] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1};
-	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context);
+	unsigned flags = 0;
+#ifdef _DEBUG
+	flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context);
 	ID3D11Texture2D* backBuffer = 0;
 	swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
 	ID3D11RenderTargetView* renderTargetView;
@@ -329,13 +333,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the vertex and index buffers
 	ID3D11Buffer *vertexBuffer, *indexBuffer;
 	for (auto bufferInfo : {
-		tuple<unsigned, void*, ID3D11Buffer**>(sizeof(VertexType) * vertexCount, vertices, &vertexBuffer),
-		tuple<unsigned, void*, ID3D11Buffer**>(sizeof(unsigned long) * indexCount, indices, &indexBuffer)
+		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(VertexType) * vertexCount, vertices, &vertexBuffer, D3D11_BIND_VERTEX_BUFFER),
+		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(unsigned long) * indexCount, indices, &indexBuffer, D3D11_BIND_INDEX_BUFFER)
 	}) {
 		D3D11_BUFFER_DESC bufferDesc;
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = get<0>(bufferInfo);
-		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		bufferDesc.BindFlags = get<3>(bufferInfo);
 		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = 0;
 		bufferDesc.StructureByteStride = 0;
