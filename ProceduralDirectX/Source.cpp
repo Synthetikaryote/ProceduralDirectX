@@ -365,6 +365,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// main loop
 	MSG msg = {0};
+	unsigned framesDrawn = 0;
 	while (true) {
 		// Check to see if any messages are waiting in the queue
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -437,6 +438,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			// Present the back buffer to the screen since rendering is complete.
 			swapChain->Present(vsync ? 1 : 0, 0);
+
+			++framesDrawn;
 		}
 	}
 
