@@ -8,9 +8,23 @@
 
 #include <d3d11.h>
 #include <directxmath.h>
+#include <d3dcompiler.h>
+#include <sstream>
+#include <tuple>
 using namespace DirectX;
+using namespace std;
 
-// the WindowProc function prototype
+struct MatrixBufferType {
+	XMMATRIX world;
+	XMMATRIX view;
+	XMMATRIX projection;
+};
+
+struct VertexType {
+	XMFLOAT3 position;
+	XMFLOAT4 color;
+};
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // the entry point for any Windows program
@@ -127,7 +141,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11Device* device = nullptr;
 	ID3D11DeviceContext* context = nullptr;
 	D3D_FEATURE_LEVEL featureLevels[] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1};
-	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context);
+	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context);
 	ID3D11Texture2D* backBuffer = 0;
 	swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
 	ID3D11RenderTargetView* renderTargetView;
@@ -224,8 +238,126 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// todo
 
 	// create an orthographic projection matrix for 2D UI rendering.
-	 XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
+	XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
 
+	// shaders
+	HRESULT result;
+	ID3D10Blob* errorMessage = 0;
+	ID3D10Blob* vertexShaderBuffer = 0;
+	ID3D10Blob* pixelShaderBuffer = 0;
+	// compile the vertex and pixel shaders
+	//assert(!FAILED(result = D3DCompileFromFile(L"color.vs", NULL, NULL, "ColorVertexShader", "vs_4_0", D3D10_SHADER_ENABLE_STRICTNESS, 0, &vertexShaderBuffer, &errorMessage)));
+	//assert(!FAILED(result = D3DCompileFromFile(L"color.ps", NULL, NULL, "ColorPixelShader", "ps_4_0", D3D10_SHADER_ENABLE_STRICTNESS, 0, &pixelShaderBuffer, &errorMessage)));
+	for (auto shaderInfo : {
+		tuple<LPCWSTR, char*, char*, ID3D10Blob**>(L"color.vs", "ColorVertexShader", "vs_4_0", &vertexShaderBuffer),
+		tuple<LPCWSTR, char*, char*, ID3D10Blob**>(L"color.ps", "ColorPixelShader", "ps_4_0", &pixelShaderBuffer)
+	}) {
+		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), D3D10_SHADER_ENABLE_STRICTNESS, 0, get<3>(shaderInfo), &errorMessage);
+		if (FAILED(result)) {
+			if (errorMessage) {
+				// show a message box with the compile errors
+				char* compileErrors = (char*)(errorMessage->GetBufferPointer());
+				wstringstream msg;
+				for (size_t i = 0; i < errorMessage->GetBufferSize(); i++)
+					msg << compileErrors[i];
+				errorMessage->Release();
+				MessageBox(hWnd, msg.str().c_str(), get<0>(shaderInfo), MB_OK);
+			}
+			else {
+				MessageBox(hWnd, get<0>(shaderInfo), L"Missing Shader File", MB_OK);
+			}
+			break;
+		}
+	}
+	ID3D11VertexShader* vertexShader = 0;
+	ID3D11PixelShader* pixelShader = 0;
+	assert(!FAILED(result = device->CreateVertexShader(vertexShaderBuffer->GetBufferPointer(), vertexShaderBuffer->GetBufferSize(), NULL, &vertexShader)));
+	assert(!FAILED(result = device->CreatePixelShader(pixelShaderBuffer->GetBufferPointer(), pixelShaderBuffer->GetBufferSize(), NULL, &pixelShader)));
+	
+	// create the vertex input layout description
+	// this setup needs to match the VertexType stucture in the shader
+	D3D11_INPUT_ELEMENT_DESC polygonLayout[2];
+	polygonLayout[0].SemanticName = "POSITION";
+	polygonLayout[0].SemanticIndex = 0;
+	polygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	polygonLayout[0].InputSlot = 0;
+	polygonLayout[0].AlignedByteOffset = 0;
+	polygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+	polygonLayout[0].InstanceDataStepRate = 0;
+
+	polygonLayout[1].SemanticName = "COLOR";
+	polygonLayout[1].SemanticIndex = 0;
+	polygonLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	polygonLayout[1].InputSlot = 0;
+	polygonLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+	polygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+	polygonLayout[1].InstanceDataStepRate = 0;
+
+	size_t numElements = sizeof(polygonLayout) / sizeof(polygonLayout[0]);
+	ID3D11InputLayout* layout;
+	assert(!FAILED(result = device->CreateInputLayout(polygonLayout, numElements, vertexShaderBuffer->GetBufferPointer(), vertexShaderBuffer->GetBufferSize(), &layout)));
+	vertexShaderBuffer->Release();
+	pixelShaderBuffer->Release();
+
+	// dynamic matrix constant buffer that's in the vertex shader
+	ID3D11Buffer* matrixBuffer = 0;
+	D3D11_BUFFER_DESC matrixBufferDesc;
+	matrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	matrixBufferDesc.ByteWidth = sizeof(MatrixBufferType);
+	matrixBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	matrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	matrixBufferDesc.MiscFlags = 0;
+	matrixBufferDesc.StructureByteStride = 0;
+	assert(!FAILED(result = device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer)));
+
+
+	// make a triangle
+	unsigned vertexCount = 3;
+	unsigned indexCount = 3;
+	VertexType* vertices = new VertexType[vertexCount];
+	unsigned long* indices = new unsigned long[indexCount];
+	vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // bottom left
+	vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // top middle
+	vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // bottom right
+	vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	indices[0] = 0;  // bottom left
+	indices[1] = 1;  // top middle
+	indices[2] = 2;  // bottom right
+
+	// create the vertex and index buffers
+	ID3D11Buffer *vertexBuffer, *indexBuffer;
+	for (auto bufferInfo : {
+		tuple<unsigned, void*, ID3D11Buffer**>(sizeof(VertexType) * vertexCount, vertices, &vertexBuffer),
+		tuple<unsigned, void*, ID3D11Buffer**>(sizeof(unsigned long) * indexCount, indices, &indexBuffer)
+	}) {
+		D3D11_BUFFER_DESC bufferDesc;
+		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+		bufferDesc.ByteWidth = get<0>(bufferInfo);
+		bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		bufferDesc.CPUAccessFlags = 0;
+		bufferDesc.MiscFlags = 0;
+		bufferDesc.StructureByteStride = 0;
+
+		// give the subresource structure a pointer to the raw data
+		D3D11_SUBRESOURCE_DATA bufferData;
+		bufferData.pSysMem = get<1>(bufferInfo);
+		bufferData.SysMemPitch = 0;
+		bufferData.SysMemSlicePitch = 0;
+
+		// create the buffer
+		assert(!FAILED(result = device->CreateBuffer(&bufferDesc, &bufferData, get<2>(bufferInfo))));
+	}
+	delete[] vertices;
+	delete[] indices;
+
+
+	// set up the camera
+	XMFLOAT3 position(0.f, 0.f, -5.f);
+	XMFLOAT3 rotation(0.f, 0.f, 0.f);
+	XMFLOAT3 up(0.f, 1.f, 0.f);
+	XMFLOAT3 forward(0.f, 0.f, 1.f);
 
 	// main loop
 	MSG msg = {0};
@@ -242,16 +374,62 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			if (msg.message == WM_QUIT)
 				break;
 		} else {
-			// background color
+			// clear the back buffer with the background color and clear the depth buffer
 			float color[4] = {1.f, 0.f, 0.f, 1.f};
-			
-			// Clear the back buffer.
 			context->ClearRenderTargetView(renderTargetView, color);
-
-			// Clear the depth buffer.
 			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-			// game rendering goes here
+			// generate the view matrix based on the camera
+			XMVECTOR upVector = XMLoadFloat3(&up);
+			XMVECTOR lookAtVector = XMLoadFloat3(&forward);
+			XMVECTOR positionVector = XMLoadFloat3(&position);
+			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(rotation.x, rotation.y, rotation.z);
+			// rotate the forward and up according to the camera rotation
+			lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
+			upVector = XMVector3TransformCoord(upVector, rotationMatrix);
+			// move the forward vector to the target position
+			lookAtVector = XMVectorAdd(positionVector, lookAtVector);
+			// create the view matrix
+			XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
+
+
+			// stage the triangle's buffers as the ones to use
+			// set the vertex buffer to active in the input assembler
+			unsigned stride = sizeof(VertexType);
+			unsigned offset = 0;
+			context->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
+			// set the index buffer to active in the input assembler
+			context->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+			// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+
+			// render the triangle using the color shader
+
+			// lock the matrixBuffer, set the new matrices inside it, and then unlock it
+			// shaders must receive transposed matrices in DirectX11
+			D3D11_MAPPED_SUBRESOURCE mappedResource;
+			assert(!FAILED(result = context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			MatrixBufferType* dataPtr = (MatrixBufferType*)mappedResource.pData;
+			dataPtr->world = XMMatrixTranspose(worldMatrix);
+			dataPtr->view = XMMatrixTranspose(viewMatrix);
+			dataPtr->projection = XMMatrixTranspose(projectionMatrix);
+			context->Unmap(matrixBuffer, 0);
+
+			// update the vertex shader constant buffer and set the position of the constant buffer
+			unsigned bufferNumber = 0;
+			context->VSSetConstantBuffers(bufferNumber, 1, &matrixBuffer);
+
+			// set the vertex input layout
+			context->IASetInputLayout(layout);
+
+			// set the vertex and pixel shaders that will be used to render this triangle
+			context->VSSetShader(vertexShader, NULL, 0);
+			context->PSSetShader(pixelShader, NULL, 0);
+
+			// render the triangle
+			context->DrawIndexed(indexCount, 0, 0);
+
 
 			// Present the back buffer to the screen since rendering is complete.
 			swapChain->Present(vsync ? 1 : 0, 0);
@@ -260,6 +438,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// clean up
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
+	if (vertexBuffer) vertexBuffer->Release();
+	if (indexBuffer) indexBuffer->Release();
+	if (matrixBuffer) matrixBuffer->Release();
+	if (layout) layout->Release();
+	if (vertexShader) vertexShader->Release();
+	if (pixelShader) pixelShader->Release();
 	if (rasterState) rasterState->Release();
 	if (depthStencilView) depthStencilView->Release();
 	if (depthStencilState) depthStencilState->Release();
@@ -286,6 +470,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		} break;
 	}
 
-	// Handle any messages the switch statement didn't
+	// handle any messages that the switch statement didn't
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
