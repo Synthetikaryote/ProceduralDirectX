@@ -6,5 +6,7 @@
   <ItemGroup>
     <None Include="color.vs" />
     <None Include="color.ps" />
+    <None Include="texture.vs" />
+    <None Include="texture.ps" />
   </ItemGroup>
 </Project>
