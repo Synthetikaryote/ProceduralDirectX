@@ -460,7 +460,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			const float alon = lon * lonStep;
 			vertices[v].position = XMFLOAT3(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon));
 			vertices[v].normal = vertices[v].position;
-			vertices[v++].texture = XMFLOAT2((float)lon / (longitudes + 1), (float)lat / (latitudes + 1));
+			vertices[v++].texture = XMFLOAT2((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f);
 		}
 	}
 	unsigned index = 0;
@@ -604,6 +604,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// create the view matrix
 			XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
 
+
+			// add rotation to the sphere
+			worldMatrix = XMMatrixRotationY(time() * 0.1f);
+
 			
 			// stage the triangle's buffers as the ones to use
 			// set the vertex buffer to active in the input assembler
@@ -615,15 +619,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-
-			// render the triangle using the texture shader
+			// render the model using the lit texture shader
 
 			// lock the matrixBuffer, set the new matrices inside it, and then unlock it
 			// shaders must receive transposed matrices in DirectX11
 			D3D11_MAPPED_SUBRESOURCE mappedResource;
 			assert(!FAILED(result = context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
 			MatrixBufferType* dataPtr = (MatrixBufferType*)mappedResource.pData;
-			worldMatrix = XMMatrixRotationY(time() * 0.1f);
 			dataPtr->world = XMMatrixTranspose(worldMatrix);
 			dataPtr->view = XMMatrixTranspose(viewMatrix);
 			dataPtr->projection = XMMatrixTranspose(projectionMatrix);
