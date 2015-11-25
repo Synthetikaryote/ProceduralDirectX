@@ -12,6 +12,7 @@
 #include <sstream>
 #include <fstream>
 #include <tuple>
+#include <chrono>
 using namespace DirectX;
 using namespace std;
 
@@ -31,6 +32,12 @@ struct VertexTextureType {
 	XMFLOAT2 texture;
 };
 
+struct VertexLitTextureType {
+	XMFLOAT3 position;
+	XMFLOAT3 normal;
+	XMFLOAT2 texture;
+};
+
 struct TargaHeader
 {
 	unsigned char data1[12];
@@ -41,6 +48,13 @@ struct TargaHeader
 };
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+// C++11 timestamp as a float
+chrono::high_resolution_clock::time_point timeStart = chrono::high_resolution_clock::now();
+float time() {
+	auto sinceStart = chrono::high_resolution_clock::now() - timeStart;
+	return ((float)sinceStart.count()) * chrono::high_resolution_clock::period::num / chrono::high_resolution_clock::period::den;
+}
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -67,8 +81,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 500 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 400 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 1000 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = {0, 0, screenWidth, screenHeight};    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -253,17 +267,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the world matrix
 	XMMATRIX worldMatrix = XMMatrixIdentity();
 
-	// create the view matrix
-	// todo
-
 	// create an orthographic projection matrix for 2D UI rendering.
 	XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
 
 	// shaders
 	HRESULT result;
 	ID3D10Blob* errorMessage = 0;
-	ID3D10Blob* colorVertexShaderBuffer = 0, * colorPixelShaderBuffer = 0;
-	ID3D10Blob* textureVertexShaderBuffer = 0, * texturePixelShaderBuffer = 0;
+	ID3D10Blob* colorVertexShaderBuffer = 0, *colorPixelShaderBuffer = 0;
+	ID3D10Blob* textureVertexShaderBuffer = 0, *texturePixelShaderBuffer = 0;
+	ID3D10Blob* litTextureVertexShaderBuffer = 0, *litTexturePixelShaderBuffer = 0;
 
 	// compile the vertex and pixel shaders
 	typedef tuple <LPCWSTR, char*, char*, ID3D10Blob**> ShaderInfo;
@@ -271,7 +283,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		ShaderInfo(L"color.vs", "ColorVertexShader", "vs_4_0", &colorVertexShaderBuffer),
 		ShaderInfo(L"color.ps", "ColorPixelShader", "ps_4_0", &colorPixelShaderBuffer),
 		ShaderInfo(L"texture.vs", "TextureVertexShader", "vs_4_0", &textureVertexShaderBuffer),
-		ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer)
+		ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer),
+		ShaderInfo(L"litTexture.vs", "LitTextureVertexShader", "vs_4_0", &litTextureVertexShaderBuffer),
+		ShaderInfo(L"litTexture.ps", "LitTexturePixelShader", "ps_4_0", &litTexturePixelShaderBuffer)
 	}) {
 		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), D3D10_SHADER_ENABLE_STRICTNESS, 0, get<3>(shaderInfo), &errorMessage);
 		if (FAILED(result)) {
@@ -290,17 +304,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			break;
 		}
 	}
+
+	// create the color shader
 	ID3D11VertexShader* colorVertexShader = 0;
 	ID3D11PixelShader* colorPixelShader = 0;
-	ID3D11VertexShader* textureVertexShader = 0;
-	ID3D11PixelShader* texturePixelShader = 0;
 	assert(!FAILED(result = device->CreateVertexShader(colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), NULL, &colorVertexShader)));
 	assert(!FAILED(result = device->CreatePixelShader(colorPixelShaderBuffer->GetBufferPointer(), colorPixelShaderBuffer->GetBufferSize(), NULL, &colorPixelShader)));
-	assert(!FAILED(result = device->CreateVertexShader(textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), NULL, &textureVertexShader)));
-	assert(!FAILED(result = device->CreatePixelShader(texturePixelShaderBuffer->GetBufferPointer(), texturePixelShaderBuffer->GetBufferSize(), NULL, &texturePixelShader)));
-
-	// create the color shader vertex input layout description
-	// this setup needs to match the VertexType stucture in the color shader
+	// this setup needs to match the VertexColorType stucture in the color shader
 	D3D11_INPUT_ELEMENT_DESC polygonLayout[2];
 	polygonLayout[0].SemanticName = "POSITION";
 	polygonLayout[0].SemanticIndex = 0;
@@ -309,7 +319,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	polygonLayout[0].AlignedByteOffset = 0;
 	polygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 	polygonLayout[0].InstanceDataStepRate = 0;
-
 	polygonLayout[1].SemanticName = "COLOR";
 	polygonLayout[1].SemanticIndex = 0;
 	polygonLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
@@ -323,8 +332,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	colorVertexShaderBuffer->Release();
 	colorPixelShaderBuffer->Release();
 
-	// create the texture shader vertex input layout description
-	// this setup needs to match the VertexType stucture in the vertex shader
+	// create the texture shader
+	ID3D11VertexShader* textureVertexShader = 0;
+	ID3D11PixelShader* texturePixelShader = 0;
+	assert(!FAILED(result = device->CreateVertexShader(textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), NULL, &textureVertexShader)));
+	assert(!FAILED(result = device->CreatePixelShader(texturePixelShaderBuffer->GetBufferPointer(), texturePixelShaderBuffer->GetBufferSize(), NULL, &texturePixelShader)));
+	// this setup needs to match the VertexTextureType stucture in the texture shader
 	polygonLayout[0].SemanticName = "POSITION";
 	polygonLayout[0].SemanticIndex = 0;
 	polygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -332,7 +345,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	polygonLayout[0].AlignedByteOffset = 0;
 	polygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 	polygonLayout[0].InstanceDataStepRate = 0;
-
 	polygonLayout[1].SemanticName = "TEXCOORD";
 	polygonLayout[1].SemanticIndex = 0;
 	polygonLayout[1].Format = DXGI_FORMAT_R32G32_FLOAT;
@@ -345,6 +357,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	assert(!FAILED(result = device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), &textureShaderInputLayout)));
 	textureVertexShaderBuffer->Release();
 	texturePixelShaderBuffer->Release();
+
+	// create the lit texture
+	ID3D11VertexShader* litTextureVertexShader = 0;
+	ID3D11PixelShader* litTexturePixelShader = 0;
+	assert(!FAILED(result = device->CreateVertexShader(litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), NULL, &litTextureVertexShader)));
+	assert(!FAILED(result = device->CreatePixelShader(litTexturePixelShaderBuffer->GetBufferPointer(), litTexturePixelShaderBuffer->GetBufferSize(), NULL, &litTexturePixelShader)));
+	// this setup needs to match the VertexLitTextureType stucture in the litTexture shader
+	D3D11_INPUT_ELEMENT_DESC textureLitLayout[3];
+	textureLitLayout[0].SemanticName = "POSITION";
+	textureLitLayout[0].SemanticIndex = 0;
+	textureLitLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	textureLitLayout[0].InputSlot = 0;
+	textureLitLayout[0].AlignedByteOffset = 0;
+	textureLitLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+	textureLitLayout[0].InstanceDataStepRate = 0;
+	textureLitLayout[1].SemanticName = "NORMAL";
+	textureLitLayout[1].SemanticIndex = 0;
+	textureLitLayout[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	textureLitLayout[1].InputSlot = 0;
+	textureLitLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+	textureLitLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+	textureLitLayout[1].InstanceDataStepRate = 0;
+	textureLitLayout[2].SemanticName = "TEXCOORD";
+	textureLitLayout[2].SemanticIndex = 0;
+	textureLitLayout[2].Format = DXGI_FORMAT_R32G32_FLOAT;
+	textureLitLayout[2].InputSlot = 0;
+	textureLitLayout[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+	textureLitLayout[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+	textureLitLayout[2].InstanceDataStepRate = 0;
+
+	ID3D11InputLayout* litTextureShaderInputLayout;
+	assert(!FAILED(result = device->CreateInputLayout(textureLitLayout, sizeof(textureLitLayout) / sizeof(textureLitLayout[0]), litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), &litTextureShaderInputLayout)));
+	litTextureVertexShaderBuffer->Release();
+	litTexturePixelShaderBuffer->Release();
 
 	// create a texture sampler state
 	D3D11_SAMPLER_DESC samplerDesc;
@@ -377,28 +423,66 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	assert(!FAILED(result = device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer)));
 
 
-	// make a triangle
-	unsigned vertexCount = 3;
-	unsigned indexCount = 3;
-	VertexTextureType* vertices = new VertexTextureType[vertexCount];
+	//// make a triangle
+	//unsigned vertexCount = 3;
+	//unsigned indexCount = 3;
+	//VertexTextureType* vertices = new VertexTextureType[vertexCount];
+	//unsigned long* indices = new unsigned long[indexCount];
+	//vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // bottom left
+	//vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
+	////vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	//vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // top middle
+	//vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
+	////vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	//vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // bottom right
+	//vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
+	////vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+	//indices[0] = 0;  // bottom left
+	//indices[1] = 1;  // top middle
+	//indices[2] = 2;  // bottom right
+
+	// make a sphere
+	// note: go to planetpixelemporium for textures
+	const float PI = 3.14159265358979f;
+	const float TWOPI = 2.f * PI;
+	unsigned latitudes = 24;
+	unsigned longitudes = 24;
+	unsigned vertexCount = (latitudes + 1) * (longitudes + 1);
+	unsigned indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	VertexLitTextureType* vertices = new VertexLitTextureType[vertexCount];
 	unsigned long* indices = new unsigned long[indexCount];
-	vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // bottom left
-	vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
-	//vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // top middle
-	vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
-	//vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // bottom right
-	vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
-	//vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	indices[0] = 0;  // bottom left
-	indices[1] = 1;  // top middle
-	indices[2] = 2;  // bottom right
+	const float latStep = PI / latitudes;
+	const float lonStep = TWOPI / longitudes;
+	unsigned v = 0;
+	for (unsigned lat = 0; lat <= latitudes; ++lat) {
+		for (unsigned lon = 0; lon <= longitudes; ++lon) {
+			const float alat = lat * latStep;
+			const float alon = lon * lonStep;
+			vertices[v].position = XMFLOAT3(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon));
+			vertices[v].normal = vertices[v].position;
+			vertices[v++].texture = XMFLOAT2((float)lon / (longitudes + 1), (float)lat / (latitudes + 1));
+		}
+	}
+	unsigned index = 0;
+	for (unsigned lat = 0; lat < latitudes; ++lat) {
+		for (unsigned lon = 0; lon < longitudes; ++lon) {
+			if (lat != latitudes - 1) {
+				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+			}
+			if (lat != 0) {
+				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+			}
+		}
+	}
 
 	// create the vertex and index buffers
 	ID3D11Buffer *vertexBuffer, *indexBuffer;
 	for (auto bufferInfo : {
-		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(VertexTextureType) * vertexCount, vertices, &vertexBuffer, D3D11_BIND_VERTEX_BUFFER),
+		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(VertexLitTextureType) * vertexCount, vertices, &vertexBuffer, D3D11_BIND_VERTEX_BUFFER),
 		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(unsigned long) * indexCount, indices, &indexBuffer, D3D11_BIND_INDEX_BUFFER)
 	}) {
 		D3D11_BUFFER_DESC bufferDesc;
@@ -423,7 +507,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	// set up the camera
-	XMFLOAT3 position(0.f, 0.f, -5.f);
+	XMFLOAT3 position(0.f, 0.f, -3.f);
 	XMFLOAT3 rotation(0.f, 0.f, 0.f);
 	XMFLOAT3 up(0.f, 1.f, 0.f);
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
@@ -432,24 +516,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// texture
 	// read the targa file
 	FILE* filePtr;
-	assert(fopen_s(&filePtr, "stone01.tga", "rb") == 0);
+	assert(fopen_s(&filePtr, "earthmap1k.tga", "rb") == 0);
 	TargaHeader targaHeader;
 	assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
-	assert(targaHeader.bpp == 32);
-	unsigned imageSize = targaHeader.width * targaHeader.height * 4;
+	assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
+	unsigned bytespp = targaHeader.bpp / 8;
+	unsigned imageSize = targaHeader.width * targaHeader.height * bytespp;
 	auto targaImage = new unsigned char[imageSize];
 	assert(targaImage);
 	assert((unsigned)fread(targaImage, 1, imageSize, filePtr) == imageSize);
 	assert(fclose(filePtr) == 0);
 	unsigned i = 0;
-	auto targaData = new unsigned char[imageSize];
+	auto targaData = new unsigned char[imageSize / bytespp * 4];
 	// targa stores it upside down, so go through the rows backwards
 	for (int r = (int)targaHeader.height - 1; r >= 0; --r) { // signed because it must become -1
-		for (unsigned j = r * targaHeader.width * 4; j < (r + 1) * targaHeader.width * 4; j += 4) {
+		for (unsigned j = r * targaHeader.width * bytespp; j < (r + 1) * targaHeader.width * bytespp; j += bytespp) {
 			targaData[i++] = targaImage[j + 2]; // red
 			targaData[i++] = targaImage[j + 1]; // green
 			targaData[i++] = targaImage[j + 0]; // blue
-			targaData[i++] = targaImage[j + 3]; // alpha
+			targaData[i++] = bytespp == 4 ? targaImage[j + 3] : 0; // alpha
 		}
 	}
 	delete[] targaImage;
@@ -502,7 +587,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				break;
 		} else {
 			// clear the back buffer with the background color and clear the depth buffer
-			float color[4] = {1.f, 0.f, 0.f, 1.f};
+			float color[4] = {0.f, 0.f, 0.f, 1.f};
 			context->ClearRenderTargetView(renderTargetView, color);
 			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -519,10 +604,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// create the view matrix
 			XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
 
-
+			
 			// stage the triangle's buffers as the ones to use
 			// set the vertex buffer to active in the input assembler
-			unsigned stride = sizeof(VertexTextureType);
+			unsigned stride = sizeof(VertexLitTextureType);
 			unsigned offset = 0;
 			context->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
 			// set the index buffer to active in the input assembler
@@ -531,13 +616,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
-			// render the triangle using the color shader
+			// render the triangle using the texture shader
 
 			// lock the matrixBuffer, set the new matrices inside it, and then unlock it
 			// shaders must receive transposed matrices in DirectX11
 			D3D11_MAPPED_SUBRESOURCE mappedResource;
 			assert(!FAILED(result = context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
 			MatrixBufferType* dataPtr = (MatrixBufferType*)mappedResource.pData;
+			worldMatrix = XMMatrixRotationY(time() * 0.1f);
 			dataPtr->world = XMMatrixTranspose(worldMatrix);
 			dataPtr->view = XMMatrixTranspose(viewMatrix);
 			dataPtr->projection = XMMatrixTranspose(projectionMatrix);
@@ -549,11 +635,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetShaderResources(0, 1, &textureView);
 
 			// set the vertex input layout
-			context->IASetInputLayout(textureShaderInputLayout);
+			context->IASetInputLayout(litTextureShaderInputLayout);
 
 			// set the vertex and pixel shaders that will be used to render this triangle
-			context->VSSetShader(textureVertexShader, NULL, 0);
-			context->PSSetShader(texturePixelShader, NULL, 0);
+			context->VSSetShader(litTextureVertexShader, NULL, 0);
+			context->PSSetShader(litTexturePixelShader, NULL, 0);
 			context->PSSetSamplers(0, 1, &samplerState);
 
 			// render the triangle

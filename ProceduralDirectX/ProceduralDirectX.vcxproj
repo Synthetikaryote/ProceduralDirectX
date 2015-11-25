@@ -69,8 +69,16 @@
   <ItemGroup>
     <None Include="color.ps" />
     <None Include="color.vs" />
+    <None Include="litTexture.vs" />
     <None Include="texture.vs" />
     <None Include="texture.ps" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="litTexture.ps">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
