@@ -8,7 +8,7 @@
     <None Include="color.ps" />
     <None Include="texture.vs" />
     <None Include="texture.ps" />
-    <None Include="litTexture.vs" />
-    <None Include="litTexture.ps" />
+    <None Include="litTexturePixelShader.fx" />
+    <None Include="litTextureVertexShader.fx" />
   </ItemGroup>
 </Project>

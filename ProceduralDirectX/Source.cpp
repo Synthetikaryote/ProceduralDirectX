@@ -21,6 +21,18 @@ struct MatrixBufferType {
 	XMMATRIX view;
 	XMMATRIX projection;
 };
+struct MaterialBufferType {
+	XMFLOAT4 materialAmbient;
+	XMFLOAT4 materialDiffuse;
+	XMFLOAT4 materialSpecular;
+};
+struct LightingBufferType {
+	XMFLOAT4 viewPosition;
+	XMFLOAT4 lightDirection;
+	XMFLOAT4 lightAmbient;
+	XMFLOAT4 lightDiffuse;
+	XMFLOAT4 lightSpecular;
+};
 
 struct VertexColorType {
 	XMFLOAT3 position;
@@ -33,13 +45,12 @@ struct VertexTextureType {
 };
 
 struct VertexLitTextureType {
-	XMFLOAT3 position;
-	XMFLOAT3 normal;
+	XMFLOAT4 position;
+	XMFLOAT4 normal;
 	XMFLOAT2 texture;
 };
 
-struct TargaHeader
-{
+struct TargaHeader {
 	unsigned char data1[12];
 	unsigned short width;
 	unsigned short height;
@@ -278,16 +289,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D10Blob* litTextureVertexShaderBuffer = 0, *litTexturePixelShaderBuffer = 0;
 
 	// compile the vertex and pixel shaders
+	UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined( DEBUG ) || defined( _DEBUG )
+	shaderFlags |= D3DCOMPILE_DEBUG;
+#endif
 	typedef tuple <LPCWSTR, char*, char*, ID3D10Blob**> ShaderInfo;
 	for (auto shaderInfo : {
 		ShaderInfo(L"color.vs", "ColorVertexShader", "vs_4_0", &colorVertexShaderBuffer),
 		ShaderInfo(L"color.ps", "ColorPixelShader", "ps_4_0", &colorPixelShaderBuffer),
 		ShaderInfo(L"texture.vs", "TextureVertexShader", "vs_4_0", &textureVertexShaderBuffer),
 		ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer),
-		ShaderInfo(L"litTexture.vs", "LitTextureVertexShader", "vs_4_0", &litTextureVertexShaderBuffer),
-		ShaderInfo(L"litTexture.ps", "LitTexturePixelShader", "ps_4_0", &litTexturePixelShaderBuffer)
+		ShaderInfo(L"litTextureVertexShader.fx", "LitTextureVertexShader", "vs_4_0", &litTextureVertexShaderBuffer),
+		ShaderInfo(L"litTexturePixelShader.fx", "LitTexturePixelShader", "ps_4_0", &litTexturePixelShaderBuffer)
 	}) {
-		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), D3D10_SHADER_ENABLE_STRICTNESS, 0, get<3>(shaderInfo), &errorMessage);
+		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), shaderFlags, 0, get<3>(shaderInfo), &errorMessage);
 		if (FAILED(result)) {
 			if (errorMessage) {
 				// show a message box with the compile errors
@@ -367,23 +382,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	D3D11_INPUT_ELEMENT_DESC textureLitLayout[3];
 	textureLitLayout[0].SemanticName = "POSITION";
 	textureLitLayout[0].SemanticIndex = 0;
-	textureLitLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	textureLitLayout[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	textureLitLayout[0].InputSlot = 0;
 	textureLitLayout[0].AlignedByteOffset = 0;
 	textureLitLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 	textureLitLayout[0].InstanceDataStepRate = 0;
 	textureLitLayout[1].SemanticName = "NORMAL";
 	textureLitLayout[1].SemanticIndex = 0;
-	textureLitLayout[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	textureLitLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	textureLitLayout[1].InputSlot = 0;
-	textureLitLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+	textureLitLayout[1].AlignedByteOffset = 16; //D3D11_APPEND_ALIGNED_ELEMENT;
 	textureLitLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 	textureLitLayout[1].InstanceDataStepRate = 0;
 	textureLitLayout[2].SemanticName = "TEXCOORD";
 	textureLitLayout[2].SemanticIndex = 0;
 	textureLitLayout[2].Format = DXGI_FORMAT_R32G32_FLOAT;
 	textureLitLayout[2].InputSlot = 0;
-	textureLitLayout[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+	textureLitLayout[2].AlignedByteOffset = 32; //D3D11_APPEND_ALIGNED_ELEMENT;
 	textureLitLayout[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
 	textureLitLayout[2].InstanceDataStepRate = 0;
 
@@ -410,8 +425,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11SamplerState* samplerState;
 	result = device->CreateSamplerState(&samplerDesc, &samplerState);
 
-	// dynamic matrix constant buffer that's in the vertex shader
-	// this is the same for both the color and texture shader
+	// dynamic matrix constant buffer that's in the vertex shaders
 	ID3D11Buffer* matrixBuffer = 0;
 	D3D11_BUFFER_DESC matrixBufferDesc;
 	matrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -422,6 +436,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	matrixBufferDesc.StructureByteStride = 0;
 	assert(!FAILED(result = device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer)));
 
+	// dynamic material constant buffer
+	ID3D11Buffer* materialBuffer = 0;
+	D3D11_BUFFER_DESC materialBufferDesc;
+	materialBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	materialBufferDesc.ByteWidth = sizeof(MaterialBufferType);
+	materialBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	materialBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	materialBufferDesc.MiscFlags = 0;
+	materialBufferDesc.StructureByteStride = 0;
+	assert(!FAILED(result = device->CreateBuffer(&materialBufferDesc, NULL, &materialBuffer)));
+
+	// dynamic lighting constant buffer
+	ID3D11Buffer* lightingBuffer = 0;
+	D3D11_BUFFER_DESC lightingBufferDesc;
+	lightingBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	lightingBufferDesc.ByteWidth = sizeof(LightingBufferType);
+	lightingBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	lightingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	lightingBufferDesc.MiscFlags = 0;
+	lightingBufferDesc.StructureByteStride = 0;
+	assert(!FAILED(result = device->CreateBuffer(&lightingBufferDesc, NULL, &lightingBuffer)));
+
+	// put all the buffers in an ordered array
+	ID3D11Buffer* constantBuffers[] = {matrixBuffer, materialBuffer, lightingBuffer};
 
 	//// make a triangle
 	//unsigned vertexCount = 3;
@@ -458,8 +496,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		for (unsigned lon = 0; lon <= longitudes; ++lon) {
 			const float alat = lat * latStep;
 			const float alon = lon * lonStep;
-			vertices[v].position = XMFLOAT3(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon));
+			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
 			vertices[v].normal = vertices[v].position;
+			vertices[v].normal.w = 0.0f;
 			vertices[v++].texture = XMFLOAT2((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f);
 		}
 	}
@@ -606,7 +645,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 			// add rotation to the sphere
-			worldMatrix = XMMatrixRotationY(time() * 0.1f);
+			worldMatrix = XMMatrixRotationY(time() * 0.3f);
 
 			
 			// stage the triangle's buffers as the ones to use
@@ -625,15 +664,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// shaders must receive transposed matrices in DirectX11
 			D3D11_MAPPED_SUBRESOURCE mappedResource;
 			assert(!FAILED(result = context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
-			MatrixBufferType* dataPtr = (MatrixBufferType*)mappedResource.pData;
-			dataPtr->world = XMMatrixTranspose(worldMatrix);
-			dataPtr->view = XMMatrixTranspose(viewMatrix);
-			dataPtr->projection = XMMatrixTranspose(projectionMatrix);
+			auto matrixDataPtr = (MatrixBufferType*)mappedResource.pData;
+			matrixDataPtr->world = XMMatrixTranspose(worldMatrix);
+			matrixDataPtr->view = XMMatrixTranspose(viewMatrix);
+			matrixDataPtr->projection = XMMatrixTranspose(projectionMatrix);
 			context->Unmap(matrixBuffer, 0);
 
-			// update the vertex shader constant buffer and set the position of the constant buffer
-			unsigned bufferNumber = 0;
-			context->VSSetConstantBuffers(bufferNumber, 1, &matrixBuffer);
+			// set the materialBuffer information
+			assert(SUCCEEDED(result = context->Map(materialBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			auto materialDataPtr = (MaterialBufferType*)mappedResource.pData;
+			materialDataPtr->materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			materialDataPtr->materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			materialDataPtr->materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+			context->Unmap(materialBuffer, 0);
+
+			// set the lightingBuffer information
+			assert(SUCCEEDED(result = context->Map(lightingBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			auto lightingDataPtr = (LightingBufferType*)mappedResource.pData;
+			lightingDataPtr->lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+			lightingDataPtr->lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			lightingDataPtr->lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
+			lightingDataPtr->lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			XMStoreFloat4(&lightingDataPtr->viewPosition, positionVector);
+			context->Unmap(lightingBuffer, 0);
+
+			// update the vertex and pixel shader constant buffers
+			// they're in the constantBuffers in the order: matrix, material, lighting
+			// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
+			// the pixel shader needs just material, lighting in its 0, 1 spots
+			context->VSSetConstantBuffers(0, 3, constantBuffers);
+			context->PSSetConstantBuffers(0, 2, &(constantBuffers[1]));
+
+			// give the pixel shader the texture
 			context->PSSetShaderResources(0, 1, &textureView);
 
 			// set the vertex input layout
@@ -644,7 +706,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetShader(litTexturePixelShader, NULL, 0);
 			context->PSSetSamplers(0, 1, &samplerState);
 
-			// render the triangle
+			// render the sphere
 			context->DrawIndexed(indexCount, 0, 0);
 
 
@@ -663,6 +725,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (vertexBuffer) vertexBuffer->Release();
 	if (indexBuffer) indexBuffer->Release();
 	if (samplerState) samplerState->Release();
+	if (lightingBuffer) lightingBuffer->Release();
+	if (materialBuffer) materialBuffer->Release();
 	if (matrixBuffer) matrixBuffer->Release();
 	if (textureShaderInputLayout) textureShaderInputLayout->Release();
 	if (textureVertexShader) textureVertexShader->Release();
