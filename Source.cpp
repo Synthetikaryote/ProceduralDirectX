@@ -5,16 +5,26 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "dwrite.lib")
 
-#include <d3d11.h>
+#include <d3d11_2.h>
 #include <directxmath.h>
 #include <d3dcompiler.h>
 #include <sstream>
 #include <fstream>
 #include <tuple>
 #include <chrono>
+#include <comdef.h>
+#include <wrl.h>
+
+// text rendering
+#include <d2d1_2.h>
+#include <dwrite.h>
+
 using namespace DirectX;
 using namespace std;
+using namespace Microsoft::WRL;
 
 struct MatrixBufferType {
 	XMMATRIX world;
@@ -65,6 +75,12 @@ chrono::high_resolution_clock::time_point timeStart = chrono::high_resolution_cl
 float time() {
 	auto sinceStart = chrono::high_resolution_clock::now() - timeStart;
 	return ((float)sinceStart.count()) * chrono::high_resolution_clock::period::num / chrono::high_resolution_clock::period::den;
+}
+
+// convert DirectX error codes to exceptions
+inline void ThrowIfFailed(HRESULT hr) {
+	if (FAILED(hr))
+		throw _com_error(hr);
 }
 
 // the entry point for any Windows program
@@ -122,13 +138,50 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	adapter->EnumOutputs(0, &adapterOutput);
 
 	// DirectX init
+	// device, context, and rendertargetview
+	ID3D11DeviceContext* context = nullptr;
+	D3D_FEATURE_LEVEL featureLevels[] = {
+		D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL_10_0,
+		D3D_FEATURE_LEVEL_9_3,
+		D3D_FEATURE_LEVEL_9_2,
+		D3D_FEATURE_LEVEL_9_1
+	};
+	unsigned flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#ifdef _DEBUG
+	flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+	ComPtr<ID3D11Device> device = nullptr;
+	D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, flags, featureLevels, ARRAYSIZE(featureLevels), D3D11_SDK_VERSION, &device, NULL, &context);
+
+	// create a direct2d device and context
+	D2D1_FACTORY_OPTIONS d2dOptions;
+	ZeroMemory(&d2dOptions, sizeof(D2D1_FACTORY_OPTIONS));
+#if defined(_DEBUG)
+	// If the project is in a debug build, enable Direct2D debugging via SDK Layers.
+	d2dOptions.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#endif
+	ID2D1Factory2* d2dFactory;
+	ThrowIfFailed(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory2), &d2dOptions, reinterpret_cast<void**>(&d2dFactory)));
+	ID2D1Device1* d2dDevice;
+	// get the underlying DXGI device of the d3d device
+	ComPtr<ID3D11Device2> d3dDevice;
+	ThrowIfFailed(device.As(&d3dDevice));
+	ComPtr<IDXGIDevice> dxgiDevice;
+	ThrowIfFailed(d3dDevice.As(&dxgiDevice));
+	ThrowIfFailed(d2dFactory->CreateDevice(dxgiDevice.Get(), &d2dDevice));
+	ID2D1DeviceContext* d2dContext;
+	ThrowIfFailed(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext));
+
 	// initialize the swap chain
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
 	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
-	swapChainDesc.BufferCount = 1; // single back buffer
+	swapChainDesc.BufferCount = 2; // double buffering to reduce latency
 	swapChainDesc.BufferDesc.Width = screenWidth;
 	swapChainDesc.BufferDesc.Height = screenHeight;
-	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.OutputWindow = hWnd;
 	// turn multisampling off
@@ -137,7 +190,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	swapChainDesc.Windowed = windowed;
 	swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	// discard the back buffer contents after presenting
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 	// don't set the advanced flags
 	swapChainDesc.Flags = 0;
@@ -162,34 +214,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
 	}
 
-	// find the video memory in megabytes
-	DXGI_ADAPTER_DESC adapterDesc;
-	adapter->GetDesc(&adapterDesc);
-	size_t videoMemoryMb = adapterDesc.DedicatedVideoMemory / 1024 / 1024;
+	//// find the video memory in megabytes
+	//DXGI_ADAPTER_DESC adapterDesc;
+	//adapter->GetDesc(&adapterDesc);
+	//size_t videoMemoryMb = adapterDesc.DedicatedVideoMemory / 1024 / 1024;
 
-	// get the video card name
-	char videoCardName[128];
-	size_t stringLength;
-	wcstombs_s(&stringLength, videoCardName, 128, adapterDesc.Description, 128);
+	//// get the video card name
+	//char videoCardName[128];
+	//size_t stringLength;
+	//wcstombs_s(&stringLength, videoCardName, 128, adapterDesc.Description, 128);
+
+	IDXGISwapChain* swapChain = nullptr;
+	factory->CreateSwapChain(device.Get(), &swapChainDesc, &swapChain);
+	ID3D11Texture2D* backBuffer = 0;
+	swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+	ID3D11RenderTargetView* renderTargetView;
+	device->CreateRenderTargetView(backBuffer, nullptr, &renderTargetView);
 
 	adapterOutput->Release();
 	adapter->Release();
 	factory->Release();
-
-	// create the swap chain, device, context, and rendertargetview
-	IDXGISwapChain* swapChain = nullptr;
-	ID3D11Device* device = nullptr;
-	ID3D11DeviceContext* context = nullptr;
-	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1 };
-	unsigned flags = 0;
-#ifdef _DEBUG
-	flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context);
-	ID3D11Texture2D* backBuffer = 0;
-	swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
-	ID3D11RenderTargetView* renderTargetView;
-	device->CreateRenderTargetView(backBuffer, NULL, &renderTargetView);
 	backBuffer->Release();
 
 	// create the depth stencil buffer
@@ -239,9 +283,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	depthStencilViewDesc.Texture2D.MipSlice = 0;
 	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilViewDesc, &depthStencilView);
 
-	// bind the render target view and depth stencil buffer to the output render pipeline
-	context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
-
 	// custom raster options, like draw as wireframe
 	ID3D11RasterizerState* rasterState = nullptr;
 	D3D11_RASTERIZER_DESC rasterDesc;
@@ -267,6 +308,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	viewport.TopLeftX = 0.0f;
 	viewport.TopLeftY = 0.0f;
 	context->RSSetViewports(1, &viewport);
+
+	// create a Direct2D target bitmap associated with the swap chain back buffer and set it as the current target
+	float dpiX = 300.0f;
+	float dpiY = 300.0f;
+	d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
+	D2D1_BITMAP_PROPERTIES1 bitmapProperties;
+	bitmapProperties.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+	bitmapProperties.dpiX = dpiX;
+	bitmapProperties.dpiY = dpiY;
+	bitmapProperties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	bitmapProperties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+	bitmapProperties.colorContext = NULL;
+	ComPtr<IDXGISurface> dxgiBackBuffer;
+	ThrowIfFailed(swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer)));
+	ComPtr<ID2D1Bitmap1> d2dTargetBitmap = nullptr;
+	ThrowIfFailed(d2dContext->CreateBitmapFromDxgiSurface(dxgiBackBuffer.Get(), &bitmapProperties, &d2dTargetBitmap));
+	d2dContext->SetTarget(d2dTargetBitmap.Get());
+	d2dContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+	d2dContext->SetDpi(dpiX, dpiY);
 
 	// create the projection matrix
 	float fieldOfView = 3.141592654f / 4.0f;
@@ -323,8 +383,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the color shader
 	ID3D11VertexShader* colorVertexShader = 0;
 	ID3D11PixelShader* colorPixelShader = 0;
-	assert(!FAILED(result = device->CreateVertexShader(colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), NULL, &colorVertexShader)));
-	assert(!FAILED(result = device->CreatePixelShader(colorPixelShaderBuffer->GetBufferPointer(), colorPixelShaderBuffer->GetBufferSize(), NULL, &colorPixelShader)));
+	ThrowIfFailed(device->CreateVertexShader(colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), NULL, &colorVertexShader));
+	ThrowIfFailed(device->CreatePixelShader(colorPixelShaderBuffer->GetBufferPointer(), colorPixelShaderBuffer->GetBufferSize(), NULL, &colorPixelShader));
 	// this setup needs to match the VertexColorType stucture in the color shader
 	D3D11_INPUT_ELEMENT_DESC polygonLayout[2];
 	polygonLayout[0].SemanticName = "POSITION";
@@ -343,15 +403,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	polygonLayout[1].InstanceDataStepRate = 0;
 
 	ID3D11InputLayout* colorShaderInputLayout;
-	assert(!FAILED(result = device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), &colorShaderInputLayout)));
+	ThrowIfFailed(device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), &colorShaderInputLayout));
 	colorVertexShaderBuffer->Release();
 	colorPixelShaderBuffer->Release();
 
 	// create the texture shader
 	ID3D11VertexShader* textureVertexShader = 0;
 	ID3D11PixelShader* texturePixelShader = 0;
-	assert(!FAILED(result = device->CreateVertexShader(textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), NULL, &textureVertexShader)));
-	assert(!FAILED(result = device->CreatePixelShader(texturePixelShaderBuffer->GetBufferPointer(), texturePixelShaderBuffer->GetBufferSize(), NULL, &texturePixelShader)));
+	ThrowIfFailed(device->CreateVertexShader(textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), NULL, &textureVertexShader));
+	ThrowIfFailed(device->CreatePixelShader(texturePixelShaderBuffer->GetBufferPointer(), texturePixelShaderBuffer->GetBufferSize(), NULL, &texturePixelShader));
 	// this setup needs to match the VertexTextureType stucture in the texture shader
 	polygonLayout[0].SemanticName = "POSITION";
 	polygonLayout[0].SemanticIndex = 0;
@@ -369,15 +429,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	polygonLayout[1].InstanceDataStepRate = 0;
 
 	ID3D11InputLayout* textureShaderInputLayout;
-	assert(!FAILED(result = device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), &textureShaderInputLayout)));
+	ThrowIfFailed(device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), &textureShaderInputLayout));
 	textureVertexShaderBuffer->Release();
 	texturePixelShaderBuffer->Release();
 
 	// create the lit texture
 	ID3D11VertexShader* litTextureVertexShader = 0;
 	ID3D11PixelShader* litTexturePixelShader = 0;
-	assert(!FAILED(result = device->CreateVertexShader(litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), NULL, &litTextureVertexShader)));
-	assert(!FAILED(result = device->CreatePixelShader(litTexturePixelShaderBuffer->GetBufferPointer(), litTexturePixelShaderBuffer->GetBufferSize(), NULL, &litTexturePixelShader)));
+	ThrowIfFailed(device->CreateVertexShader(litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), NULL, &litTextureVertexShader));
+	ThrowIfFailed(device->CreatePixelShader(litTexturePixelShaderBuffer->GetBufferPointer(), litTexturePixelShaderBuffer->GetBufferSize(), NULL, &litTexturePixelShader));
 	// this setup needs to match the VertexLitTextureType stucture in the litTexture shader
 	D3D11_INPUT_ELEMENT_DESC textureLitLayout[3];
 	textureLitLayout[0].SemanticName = "POSITION";
@@ -403,7 +463,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	textureLitLayout[2].InstanceDataStepRate = 0;
 
 	ID3D11InputLayout* litTextureShaderInputLayout;
-	assert(!FAILED(result = device->CreateInputLayout(textureLitLayout, sizeof(textureLitLayout) / sizeof(textureLitLayout[0]), litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), &litTextureShaderInputLayout)));
+	ThrowIfFailed(device->CreateInputLayout(textureLitLayout, sizeof(textureLitLayout) / sizeof(textureLitLayout[0]), litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), &litTextureShaderInputLayout));
 	litTextureVertexShaderBuffer->Release();
 	litTexturePixelShaderBuffer->Release();
 
@@ -434,7 +494,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	matrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	matrixBufferDesc.MiscFlags = 0;
 	matrixBufferDesc.StructureByteStride = 0;
-	assert(!FAILED(result = device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer)));
+	ThrowIfFailed(device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer));
 
 	// dynamic material constant buffer
 	ID3D11Buffer* materialBuffer = 0;
@@ -445,7 +505,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	materialBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	materialBufferDesc.MiscFlags = 0;
 	materialBufferDesc.StructureByteStride = 0;
-	assert(!FAILED(result = device->CreateBuffer(&materialBufferDesc, NULL, &materialBuffer)));
+	ThrowIfFailed(device->CreateBuffer(&materialBufferDesc, NULL, &materialBuffer));
 
 	// dynamic lighting constant buffer
 	ID3D11Buffer* lightingBuffer = 0;
@@ -456,7 +516,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	lightingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	lightingBufferDesc.MiscFlags = 0;
 	lightingBufferDesc.StructureByteStride = 0;
-	assert(!FAILED(result = device->CreateBuffer(&lightingBufferDesc, NULL, &lightingBuffer)));
+	ThrowIfFailed(device->CreateBuffer(&lightingBufferDesc, NULL, &lightingBuffer));
 
 	// put all the buffers in an ordered array
 	ID3D11Buffer* constantBuffers[] = { matrixBuffer, materialBuffer, lightingBuffer };
@@ -539,7 +599,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		bufferData.SysMemSlicePitch = 0;
 
 		// create the buffer
-		assert(!FAILED(result = device->CreateBuffer(&bufferDesc, &bufferData, get<2>(bufferInfo))));
+		ThrowIfFailed(device->CreateBuffer(&bufferDesc, &bufferData, get<2>(bufferInfo)));
 	}
 	delete[] vertices;
 	delete[] indices;
@@ -550,6 +610,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMFLOAT3 rotation(0.f, 0.f, 0.f);
 	XMFLOAT3 up(0.f, 1.f, 0.f);
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
+
+
+	// text
+	// create a white brush
+	ID2D1SolidColorBrush* whiteBrush;
+	ThrowIfFailed(d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &whiteBrush));
+	// create the directWrite factory
+	IDWriteFactory* writeFactory;
+	ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&writeFactory)));
+	IDWriteTextFormat* textFormat;
+	// font name, font collection (NULL = system)
+	ThrowIfFailed(writeFactory->CreateTextFormat(L"Gabriola", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 72.0f, L"en-us", &textFormat));
+	// align top-left
+	ThrowIfFailed(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
+	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+	const wchar_t* text = L"FPS: test";
+	UINT32 textLength = (UINT32)wcslen(text);
+	IDWriteTextLayout* textLayout;
+	writeFactory->CreateTextLayout(text, textLength, textFormat, 4096.f, 4096.f, &textLayout);
 
 
 	// texture
@@ -592,7 +671,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	textureDesc.CPUAccessFlags = 0;
 	textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	ID3D11Texture2D* texture;
-	assert(!FAILED(result = device->CreateTexture2D(&textureDesc, NULL, &texture)));
+	ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &texture));
 	// copy the image data into the texture
 	context->UpdateSubresource(texture, 0, NULL, targaData, targaHeader.width * 4 * sizeof(unsigned char), 0);
 
@@ -603,10 +682,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.MipLevels = -1;
 	ID3D11ShaderResourceView* textureView;
-	assert(!FAILED(result = device->CreateShaderResourceView(texture, &srvDesc, &textureView)));
+	ThrowIfFailed(device->CreateShaderResourceView(texture, &srvDesc, &textureView));
 
 	// generate mipmaps
 	context->GenerateMips(textureView);
+
 
 
 	// main loop
@@ -626,6 +706,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				break;
 		}
 		else {
+			// bind the render target view and depth stencil buffer to the output render pipeline
+			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
+
 			// clear the back buffer with the background color and clear the depth buffer
 			float color[4] = { 0.f, 0.f, 0.f, 1.f };
 			context->ClearRenderTargetView(renderTargetView, color);
@@ -664,7 +747,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// lock the matrixBuffer, set the new matrices inside it, and then unlock it
 			// shaders must receive transposed matrices in DirectX11
 			D3D11_MAPPED_SUBRESOURCE mappedResource;
-			assert(!FAILED(result = context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			ThrowIfFailed(context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
 			auto matrixDataPtr = (MatrixBufferType*)mappedResource.pData;
 			matrixDataPtr->world = XMMatrixTranspose(worldMatrix);
 			matrixDataPtr->view = XMMatrixTranspose(viewMatrix);
@@ -672,7 +755,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->Unmap(matrixBuffer, 0);
 
 			// set the materialBuffer information
-			assert(SUCCEEDED(result = context->Map(materialBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			ThrowIfFailed(context->Map(materialBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
 			auto materialDataPtr = (MaterialBufferType*)mappedResource.pData;
 			materialDataPtr->materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			materialDataPtr->materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -680,7 +763,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->Unmap(materialBuffer, 0);
 
 			// set the lightingBuffer information
-			assert(SUCCEEDED(result = context->Map(lightingBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)));
+			ThrowIfFailed(context->Map(lightingBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
 			auto lightingDataPtr = (LightingBufferType*)mappedResource.pData;
 			lightingDataPtr->lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
 			lightingDataPtr->lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -710,6 +793,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// render the sphere
 			context->DrawIndexed(indexCount, 0, 0);
 
+			// show the fps
+			d2dContext->BeginDraw();
+			d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
+			d2dContext->DrawTextLayout(D2D1::Point2F(10.f, 10.f), textLayout, whiteBrush);
+			d2dContext->EndDraw();
+
 
 			// Present the back buffer to the screen since rendering is complete.
 			swapChain->Present(vsync ? 1 : 0, 0);
@@ -719,6 +808,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// clean up
+	if (whiteBrush) whiteBrush->Release();
+	if (d2dContext) d2dContext->Release();
+	if (d2dDevice) d2dDevice->Release();
+	if (d2dFactory) d2dFactory->Release();
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
 	if (textureView) textureView->Release();
 	if (texture) texture->Release();
@@ -741,7 +834,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (depthStencilBuffer) depthStencilBuffer->Release();
 	if (renderTargetView) renderTargetView->Release();
 	if (context) context->Release();
-	if (device) device->Release();
+	if (device) device.Get()->Release();
 	if (swapChain) swapChain->Release();
 
 	// return this part of the WM_QUIT message to Windows
