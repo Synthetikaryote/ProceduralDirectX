@@ -690,7 +690,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	unsigned framesDrawn = 0;
 	float lastFrameTime = 0;
 	float fpsElapsed = 1.f;
-	float fpsUpdateDelay = 1.f / 60.f;
+	float fpsUpdateDelay = 0.5f;
 	UINT32 fpsLength = 0;
 	wchar_t fps[80];
 	while (true) {
@@ -798,11 +798,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->DrawIndexed(indexCount, 0, 0);
 
 			// show the fps
+			++framesDrawn;
 			fpsElapsed += elapsed;
 			if (fpsElapsed >= fpsUpdateDelay) {
-				swprintf_s(fps, L"fps: %.0f            ", framesDrawn / fpsElapsed);
+				swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
 				fpsLength = (UINT32)wcslen(fps);
-				fpsElapsed -= fpsUpdateDelay;
+				fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
+				fpsElapsed = 0;
 				framesDrawn = 0;
 			}
 			d2dContext->BeginDraw();
@@ -813,8 +815,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			// Present the back buffer to the screen since rendering is complete.
 			swapChain->Present(vsync ? 1 : 0, 0);
-
-			++framesDrawn;
 		}
 	}
 
