@@ -612,25 +612,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
 
 
-	// text
-	// create a white brush
-	ID2D1SolidColorBrush* whiteBrush;
-	ThrowIfFailed(d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &whiteBrush));
-	// create the directWrite factory
-	IDWriteFactory* writeFactory;
-	ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&writeFactory)));
-	IDWriteTextFormat* textFormat;
-	// font name, font collection (NULL = system)
-	ThrowIfFailed(writeFactory->CreateTextFormat(L"Gabriola", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 72.0f, L"en-us", &textFormat));
-	// align top-left
-	ThrowIfFailed(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
-	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-	const wchar_t* text = L"FPS: test";
-	UINT32 textLength = (UINT32)wcslen(text);
-	IDWriteTextLayout* textLayout;
-	writeFactory->CreateTextLayout(text, textLength, textFormat, 4096.f, 4096.f, &textLayout);
-
-
 	// texture
 	// read the targa file
 	FILE* filePtr;
@@ -688,10 +669,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	context->GenerateMips(textureView);
 
 
+	// text
+	// create a white brush
+	ID2D1SolidColorBrush* whiteBrush;
+	ThrowIfFailed(d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &whiteBrush));
+	// create the directWrite factory
+	IDWriteFactory* writeFactory;
+	ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&writeFactory)));
+	IDWriteTextFormat* textFormat;
+	// font name, font collection (NULL = system)
+	ThrowIfFailed(writeFactory->CreateTextFormat(L"Consolas", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 20.0f, L"en-us", &textFormat));
+	// align top-left
+	ThrowIfFailed(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
+	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+
+
 
 	// main loop
 	MSG msg = { 0 };
 	unsigned framesDrawn = 0;
+	float lastFrameTime = 0;
+	float fpsElapsed = 1.f;
+	float fpsUpdateDelay = 1.f / 60.f;
+	UINT32 fpsLength = 0;
+	wchar_t fps[80];
 	while (true) {
 		// Check to see if any messages are waiting in the queue
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -706,6 +707,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				break;
 		}
 		else {
+			float elapsed = time() - lastFrameTime;
+			lastFrameTime = time();
+
 			// bind the render target view and depth stencil buffer to the output render pipeline
 			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
 
@@ -794,9 +798,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->DrawIndexed(indexCount, 0, 0);
 
 			// show the fps
+			fpsElapsed += elapsed;
+			if (fpsElapsed >= fpsUpdateDelay) {
+				swprintf_s(fps, L"fps: %.0f            ", framesDrawn / fpsElapsed);
+				fpsLength = (UINT32)wcslen(fps);
+				fpsElapsed -= fpsUpdateDelay;
+				framesDrawn = 0;
+			}
 			d2dContext->BeginDraw();
 			d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
-			d2dContext->DrawTextLayout(D2D1::Point2F(10.f, 10.f), textLayout, whiteBrush);
+			d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
 			d2dContext->EndDraw();
 
 
