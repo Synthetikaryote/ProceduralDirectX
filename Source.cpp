@@ -13,7 +13,10 @@
 #include <d3dcompiler.h>
 #include <sstream>
 #include <fstream>
+#include <iterator>
+#include <algorithm>
 #include <tuple>
+#include <vector>
 #include <chrono>
 #include <comdef.h>
 #include <wrl.h>
@@ -82,6 +85,18 @@ inline void ThrowIfFailed(HRESULT hr) {
 	if (FAILED(hr))
 		throw _com_error(hr);
 }
+
+vector<uint8_t> Read(string path){
+	vector<uint8_t> data;
+	fstream file(path, ios::in | ios::ate | ios::binary);
+	if (file.is_open()) {
+		data.resize(file.tellg());
+		file.seekg(0, ios::beg);
+		file.read(reinterpret_cast<char*>(&data[0]), data.size());
+		file.close();
+	}
+	return data;
+};
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -343,42 +358,42 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// shaders
 	HRESULT result;
-	ID3D10Blob* errorMessage = 0;
-	//ID3D10Blob* colorVertexShaderBuffer = 0, *colorPixelShaderBuffer = 0;
-	//ID3D10Blob* textureVertexShaderBuffer = 0, *texturePixelShaderBuffer = 0;
-	ID3D10Blob* litTextureVertexShaderBuffer = 0, *litTexturePixelShaderBuffer = 0;
-
-	// compile the vertex and pixel shaders
-	UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
-#if defined( DEBUG ) || defined( _DEBUG )
-	shaderFlags |= D3DCOMPILE_DEBUG;
-#endif
-	typedef tuple <LPCWSTR, char*, char*, ID3D10Blob**> ShaderInfo;
-	for (auto shaderInfo : {
-		//ShaderInfo(L"color.vs", "ColorVertexShader", "vs_4_0", &colorVertexShaderBuffer),
-		//ShaderInfo(L"color.ps", "ColorPixelShader", "ps_4_0", &colorPixelShaderBuffer),
-		//ShaderInfo(L"texture.vs", "TextureVertexShader", "vs_4_0", &textureVertexShaderBuffer),
-		//ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer),
-		ShaderInfo(L"litTexture.hlsl", "VertexShaderFunction", "vs_4_0", &litTextureVertexShaderBuffer),
-		ShaderInfo(L"litTexture.hlsl", "PixelShaderFunction", "ps_4_0", &litTexturePixelShaderBuffer)
-	}) {
-		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), shaderFlags, 0, get<3>(shaderInfo), &errorMessage);
-		if (FAILED(result)) {
-			if (errorMessage) {
-				// show a message box with the compile errors
-				char* compileErrors = (char*)(errorMessage->GetBufferPointer());
-				wstringstream msg;
-				for (size_t i = 0; i < errorMessage->GetBufferSize(); i++)
-					msg << compileErrors[i];
-				errorMessage->Release();
-				MessageBox(hWnd, msg.str().c_str(), get<0>(shaderInfo), MB_OK);
-			}
-			else {
-				MessageBox(hWnd, get<0>(shaderInfo), L"Missing Shader File", MB_OK);
-			}
-			break;
-		}
-	}
+	//	ID3D10Blob* errorMessage = 0;
+	//	//ID3D10Blob* colorVertexShaderBuffer = 0, *colorPixelShaderBuffer = 0;
+	//	//ID3D10Blob* textureVertexShaderBuffer = 0, *texturePixelShaderBuffer = 0;
+	//	ID3D10Blob* litTextureVertexShaderBuffer = 0, *litTexturePixelShaderBuffer = 0;
+	//
+	//	// compile the vertex and pixel shaders
+	//	UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+	//#if defined( DEBUG ) || defined( _DEBUG )
+	//	shaderFlags |= D3DCOMPILE_DEBUG;
+	//#endif
+	//	typedef tuple <LPCWSTR, char*, char*, ID3D10Blob**> ShaderInfo;
+	//	for (auto shaderInfo : {
+	//		//ShaderInfo(L"color.vs", "ColorVertexShader", "vs_4_0", &colorVertexShaderBuffer),
+	//		//ShaderInfo(L"color.ps", "ColorPixelShader", "ps_4_0", &colorPixelShaderBuffer),
+	//		//ShaderInfo(L"texture.vs", "TextureVertexShader", "vs_4_0", &textureVertexShaderBuffer),
+	//		//ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer),
+	//		ShaderInfo(L"LitTextureVS.hlsl", "VertexShaderFunction", "vs_4_0", &litTextureVertexShaderBuffer),
+	//		ShaderInfo(L"LitTexturePS.hlsl", "PixelShaderFunction", "ps_4_0", &litTexturePixelShaderBuffer)
+	//	}) {
+	//		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), shaderFlags, 0, get<3>(shaderInfo), &errorMessage);
+	//		if (FAILED(result)) {
+	//			if (errorMessage) {
+	//				// show a message box with the compile errors
+	//				char* compileErrors = (char*)(errorMessage->GetBufferPointer());
+	//				wstringstream msg;
+	//				for (size_t i = 0; i < errorMessage->GetBufferSize(); i++)
+	//					msg << compileErrors[i];
+	//				errorMessage->Release();
+	//				MessageBox(hWnd, msg.str().c_str(), get<0>(shaderInfo), MB_OK);
+	//			}
+	//			else {
+	//				MessageBox(hWnd, get<0>(shaderInfo), L"Missing Shader File", MB_OK);
+	//			}
+	//			break;
+	//		}
+	//	}
 
 	//// create the color shader
 	//ID3D11VertexShader* colorVertexShader = 0;
@@ -434,54 +449,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//texturePixelShaderBuffer->Release();
 
 	// create the lit texture
-	ID3D11VertexShader* litTextureVertexShader = 0;
-	ID3D11PixelShader* litTexturePixelShader = 0;
-	ThrowIfFailed(device->CreateVertexShader(litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), NULL, &litTextureVertexShader));
-	ThrowIfFailed(device->CreatePixelShader(litTexturePixelShaderBuffer->GetBufferPointer(), litTexturePixelShaderBuffer->GetBufferSize(), NULL, &litTexturePixelShader));
-	// this setup needs to match the VertexLitTextureType stucture in the litTexture shader
-	D3D11_INPUT_ELEMENT_DESC textureLitLayout[3];
-	textureLitLayout[0].SemanticName = "POSITION";
-	textureLitLayout[0].SemanticIndex = 0;
-	textureLitLayout[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	textureLitLayout[0].InputSlot = 0;
-	textureLitLayout[0].AlignedByteOffset = 0;
-	textureLitLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	textureLitLayout[0].InstanceDataStepRate = 0;
-	textureLitLayout[1].SemanticName = "NORMAL";
-	textureLitLayout[1].SemanticIndex = 0;
-	textureLitLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	textureLitLayout[1].InputSlot = 0;
-	textureLitLayout[1].AlignedByteOffset = 16; //D3D11_APPEND_ALIGNED_ELEMENT;
-	textureLitLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	textureLitLayout[1].InstanceDataStepRate = 0;
-	textureLitLayout[2].SemanticName = "TEXCOORD";
-	textureLitLayout[2].SemanticIndex = 0;
-	textureLitLayout[2].Format = DXGI_FORMAT_R32G32_FLOAT;
-	textureLitLayout[2].InputSlot = 0;
-	textureLitLayout[2].AlignedByteOffset = 32; //D3D11_APPEND_ALIGNED_ELEMENT;
-	textureLitLayout[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	textureLitLayout[2].InstanceDataStepRate = 0;
+	ComPtr<ID3D11VertexShader> litTextureVertexShader;
+	auto vsBytecode = Read("LitTextureVS.cso");
+	ThrowIfFailed(device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &litTextureVertexShader));
 
+	// this needs to match VertexShaderInput in litTexture.hlsl
+	D3D11_INPUT_ELEMENT_DESC textureLitLayout[] = {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
 	ID3D11InputLayout* litTextureShaderInputLayout;
-	ThrowIfFailed(device->CreateInputLayout(textureLitLayout, sizeof(textureLitLayout) / sizeof(textureLitLayout[0]), litTextureVertexShaderBuffer->GetBufferPointer(), litTextureVertexShaderBuffer->GetBufferSize(), &litTextureShaderInputLayout));
-	litTextureVertexShaderBuffer->Release();
-	litTexturePixelShaderBuffer->Release();
+	ThrowIfFailed(device->CreateInputLayout(textureLitLayout, ARRAYSIZE(textureLitLayout), &vsBytecode[0], vsBytecode.size(), &litTextureShaderInputLayout));
+
+	ID3D11PixelShader* litTexturePixelShader = 0;
+	auto psBytecode = Read("LitTexturePS.cso");
+	ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &litTexturePixelShader));
+
 
 	// create a texture sampler state
-	D3D11_SAMPLER_DESC samplerDesc;
-	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	samplerDesc.MipLODBias = 0.0f;
-	samplerDesc.MaxAnisotropy = 1;
-	samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-	samplerDesc.BorderColor[0] = 0;
-	samplerDesc.BorderColor[1] = 0;
-	samplerDesc.BorderColor[2] = 0;
-	samplerDesc.BorderColor[3] = 0;
-	samplerDesc.MinLOD = 0;
-	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+		D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP,
+		0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	ID3D11SamplerState* samplerState;
 	result = device->CreateSamplerState(&samplerDesc, &samplerState);
 
@@ -685,14 +674,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 
-	// update the vertex and pixel shader constant buffers
-	// they're in the constantBuffers in the order: matrix, material, lighting
-	// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
-	context->VSSetConstantBuffers(0, 3, constantBuffers);
-	// the pixel shader just needs material, lighting in its 1, 2 spots
-	context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
-
-
 	// main loop
 	MSG msg = { 0 };
 	unsigned framesDrawn = 0;
@@ -784,6 +765,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			XMStoreFloat4(&lightingDataPtr->viewPosition, positionVector);
 			context->Unmap(lightingBuffer, 0);
 
+			// update the vertex and pixel shader constant buffers
+			// they're in the constantBuffers in the order: matrix, material, lighting
+			// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
+			context->VSSetConstantBuffers(0, 3, constantBuffers);
+			// the pixel shader just needs material, lighting in its 1, 2 spots
+			context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
 
 			// give the pixel shader the texture
 			context->PSSetShaderResources(0, 1, &textureView);
@@ -792,7 +779,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->IASetInputLayout(litTextureShaderInputLayout);
 
 			// set the vertex and pixel shaders that will be used to render this triangle
-			context->VSSetShader(litTextureVertexShader, NULL, 0);
+			context->VSSetShader(litTextureVertexShader.Get(), NULL, 0);
 			context->PSSetShader(litTexturePixelShader, NULL, 0);
 			context->PSSetSamplers(0, 1, &samplerState);
 

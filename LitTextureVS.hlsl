@@ -1,7 +1,4 @@
 // globals
-Texture2D shaderTexture;
-SamplerState SampleType;
-
 cbuffer MatrixBuffer : register(b0) {
     matrix worldMatrix;
     matrix viewMatrix;
@@ -56,26 +53,4 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
     output.tex = input.tex;
 
     return output;
-}
-
-// pixel shader
-float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
-    float4 ambient = saturate(lightAmbient * materialAmbient);
-
-    float4 diffuseColor = shaderTexture.Sample(SampleType, input.tex);
-
-    float3 dirToLight = normalize(input.dirToLight);
-    float3 dirToView = normalize(input.dirToView);
-    float3 normal = normalize(input.normal);
-    float d = saturate(dot(dirToLight, normal));
-    float intensity = 1.0f;
-    float4 diffuse = intensity * d * lightDiffuse * materialDiffuse;
-
-    float3 reflected = reflect(-dirToLight, normal);
-    float shininess = 3.0f;
-    float rdv = dot(reflected, dirToView);
-    float s = pow(saturate(rdv), shininess);
-    float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
-
-    return (diffuse + ambient) * diffuseColor + specular;
 }

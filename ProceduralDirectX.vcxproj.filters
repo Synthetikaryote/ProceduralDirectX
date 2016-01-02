@@ -8,6 +8,9 @@
     <None Include="color.ps" />
     <None Include="texture.vs" />
     <None Include="texture.ps" />
-    <None Include="litTexture.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="LitTexturePS.hlsl" />
+    <FxCompile Include="LitTextureVS.hlsl" />
   </ItemGroup>
 </Project>
