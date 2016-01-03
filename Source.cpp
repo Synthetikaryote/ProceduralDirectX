@@ -12,14 +12,13 @@
 #include <directxmath.h>
 #include <d3dcompiler.h>
 #include <sstream>
-#include <fstream>
-#include <iterator>
-#include <algorithm>
 #include <tuple>
 #include <vector>
-#include <chrono>
-#include <comdef.h>
 #include <wrl.h>
+#include <string>
+
+#include "Uber.h"
+#include "Shader.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -72,31 +71,6 @@ struct TargaHeader {
 };
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
-// C++11 timestamp as a float
-chrono::high_resolution_clock::time_point timeStart = chrono::high_resolution_clock::now();
-float time() {
-	auto sinceStart = chrono::high_resolution_clock::now() - timeStart;
-	return ((float)sinceStart.count()) * chrono::high_resolution_clock::period::num / chrono::high_resolution_clock::period::den;
-}
-
-// convert DirectX error codes to exceptions
-inline void ThrowIfFailed(HRESULT hr) {
-	if (FAILED(hr))
-		throw _com_error(hr);
-}
-
-vector<uint8_t> Read(string path){
-	vector<uint8_t> data;
-	fstream file(path, ios::in | ios::ate | ios::binary);
-	if (file.is_open()) {
-		data.resize(file.tellg());
-		file.seekg(0, ios::beg);
-		file.read(reinterpret_cast<char*>(&data[0]), data.size());
-		file.close();
-	}
-	return data;
-};
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -168,7 +142,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #ifdef _DEBUG
 	flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
-	ComPtr<ID3D11Device> device = nullptr;
+	ComPtr<ID3D11Device>& device = Uber::I().device;
 	D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, flags, featureLevels, ARRAYSIZE(featureLevels), D3D11_SDK_VERSION, &device, NULL, &context);
 
 	// create a direct2d device and context
@@ -344,7 +318,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	d2dContext->SetDpi(dpiX, dpiY);
 
 	// create the projection matrix
-	float fieldOfView = 3.141592654f / 4.0f;
+	const float PI = 3.14159265358979f;
+	float fieldOfView = PI / 4.0f;
 	float screenAspect = (float)screenWidth / (float)screenHeight;
 	float screenDepth = 1000.0f;
 	float screenNear = 0.1f;
@@ -357,6 +332,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
 
 	// shaders
+	Shader litTexture("LitTextureVS.cso", "LitTexturePS.cso", {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	});
 	HRESULT result;
 	//	ID3D10Blob* errorMessage = 0;
 	//	//ID3D10Blob* colorVertexShaderBuffer = 0, *colorPixelShaderBuffer = 0;
@@ -449,28 +429,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//texturePixelShaderBuffer->Release();
 
 	// create the lit texture
-	ComPtr<ID3D11VertexShader> litTextureVertexShader;
-	auto vsBytecode = Read("LitTextureVS.cso");
-	ThrowIfFailed(device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &litTextureVertexShader));
+	//ComPtr<ID3D11VertexShader> litTextureVertexShader;
+	//auto vsBytecode = Read("LitTextureVS.cso");
+	//ThrowIfFailed(device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &litTextureVertexShader));
 
-	// this needs to match VertexShaderInput in litTexture.hlsl
-	D3D11_INPUT_ELEMENT_DESC textureLitLayout[] = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-	ID3D11InputLayout* litTextureShaderInputLayout;
-	ThrowIfFailed(device->CreateInputLayout(textureLitLayout, ARRAYSIZE(textureLitLayout), &vsBytecode[0], vsBytecode.size(), &litTextureShaderInputLayout));
+	//// this needs to match VertexShaderInput in the litTexture shaders
+	//D3D11_INPUT_ELEMENT_DESC textureLitLayout[] = {
+	//		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	//		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	//		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	//};
+	//ID3D11InputLayout* litTextureShaderInputLayout;
+	//ThrowIfFailed(device->CreateInputLayout(textureLitLayout, ARRAYSIZE(textureLitLayout), &vsBytecode[0], vsBytecode.size(), &litTextureShaderInputLayout));
 
-	ID3D11PixelShader* litTexturePixelShader = 0;
-	auto psBytecode = Read("LitTexturePS.cso");
-	ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &litTexturePixelShader));
+	//ID3D11PixelShader* litTexturePixelShader = 0;
+	//auto psBytecode = Read("LitTexturePS.cso");
+	//ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &litTexturePixelShader));
 
 
 	// create a texture sampler state
-	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR,
-		D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP,
-		0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
+	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	ID3D11SamplerState* samplerState;
 	result = device->CreateSamplerState(&samplerDesc, &samplerState);
 
@@ -530,7 +508,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// make a sphere
 	// note: go to planetpixelemporium for textures
-	const float PI = 3.14159265358979f;
 	const float TWOPI = 2.f * PI;
 	unsigned latitudes = 24;
 	unsigned longitudes = 24;
@@ -776,11 +753,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetShaderResources(0, 1, &textureView);
 
 			// set the vertex input layout
-			context->IASetInputLayout(litTextureShaderInputLayout);
+			context->IASetInputLayout(litTexture.inputLayout);
 
 			// set the vertex and pixel shaders that will be used to render this triangle
-			context->VSSetShader(litTextureVertexShader.Get(), NULL, 0);
-			context->PSSetShader(litTexturePixelShader, NULL, 0);
+			context->VSSetShader(litTexture.vertexShader, NULL, 0);
+			context->PSSetShader(litTexture.pixelShader, NULL, 0);
 			context->PSSetSamplers(0, 1, &samplerState);
 
 			// render the sphere

@@ -2,6 +2,8 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="Uber.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="color.vs" />
@@ -12,5 +14,9 @@
   <ItemGroup>
     <FxCompile Include="LitTexturePS.hlsl" />
     <FxCompile Include="LitTextureVS.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Shader.h" />
+    <ClInclude Include="Uber.h" />
   </ItemGroup>
 </Project>
