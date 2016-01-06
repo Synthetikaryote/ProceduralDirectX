@@ -14,6 +14,7 @@
 #include <sstream>
 #include <tuple>
 #include <vector>
+#include <map>
 #include <wrl.h>
 #include <string>
 
@@ -337,120 +338,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	});
-	HRESULT result;
-	//	ID3D10Blob* errorMessage = 0;
-	//	//ID3D10Blob* colorVertexShaderBuffer = 0, *colorPixelShaderBuffer = 0;
-	//	//ID3D10Blob* textureVertexShaderBuffer = 0, *texturePixelShaderBuffer = 0;
-	//	ID3D10Blob* litTextureVertexShaderBuffer = 0, *litTexturePixelShaderBuffer = 0;
-	//
-	//	// compile the vertex and pixel shaders
-	//	UINT shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
-	//#if defined( DEBUG ) || defined( _DEBUG )
-	//	shaderFlags |= D3DCOMPILE_DEBUG;
-	//#endif
-	//	typedef tuple <LPCWSTR, char*, char*, ID3D10Blob**> ShaderInfo;
-	//	for (auto shaderInfo : {
-	//		//ShaderInfo(L"color.vs", "ColorVertexShader", "vs_4_0", &colorVertexShaderBuffer),
-	//		//ShaderInfo(L"color.ps", "ColorPixelShader", "ps_4_0", &colorPixelShaderBuffer),
-	//		//ShaderInfo(L"texture.vs", "TextureVertexShader", "vs_4_0", &textureVertexShaderBuffer),
-	//		//ShaderInfo(L"texture.ps", "TexturePixelShader", "ps_4_0", &texturePixelShaderBuffer),
-	//		ShaderInfo(L"LitTextureVS.hlsl", "VertexShaderFunction", "vs_4_0", &litTextureVertexShaderBuffer),
-	//		ShaderInfo(L"LitTexturePS.hlsl", "PixelShaderFunction", "ps_4_0", &litTexturePixelShaderBuffer)
-	//	}) {
-	//		result = D3DCompileFromFile(get<0>(shaderInfo), NULL, NULL, get<1>(shaderInfo), get<2>(shaderInfo), shaderFlags, 0, get<3>(shaderInfo), &errorMessage);
-	//		if (FAILED(result)) {
-	//			if (errorMessage) {
-	//				// show a message box with the compile errors
-	//				char* compileErrors = (char*)(errorMessage->GetBufferPointer());
-	//				wstringstream msg;
-	//				for (size_t i = 0; i < errorMessage->GetBufferSize(); i++)
-	//					msg << compileErrors[i];
-	//				errorMessage->Release();
-	//				MessageBox(hWnd, msg.str().c_str(), get<0>(shaderInfo), MB_OK);
-	//			}
-	//			else {
-	//				MessageBox(hWnd, get<0>(shaderInfo), L"Missing Shader File", MB_OK);
-	//			}
-	//			break;
-	//		}
-	//	}
-
-	//// create the color shader
-	//ID3D11VertexShader* colorVertexShader = 0;
-	//ID3D11PixelShader* colorPixelShader = 0;
-	//ThrowIfFailed(device->CreateVertexShader(colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), NULL, &colorVertexShader));
-	//ThrowIfFailed(device->CreatePixelShader(colorPixelShaderBuffer->GetBufferPointer(), colorPixelShaderBuffer->GetBufferSize(), NULL, &colorPixelShader));
-	//// this setup needs to match the VertexColorType stucture in the color shader
-	//D3D11_INPUT_ELEMENT_DESC polygonLayout[2];
-	//polygonLayout[0].SemanticName = "POSITION";
-	//polygonLayout[0].SemanticIndex = 0;
-	//polygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	//polygonLayout[0].InputSlot = 0;
-	//polygonLayout[0].AlignedByteOffset = 0;
-	//polygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	//polygonLayout[0].InstanceDataStepRate = 0;
-	//polygonLayout[1].SemanticName = "COLOR";
-	//polygonLayout[1].SemanticIndex = 0;
-	//polygonLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	//polygonLayout[1].InputSlot = 0;
-	//polygonLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-	//polygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	//polygonLayout[1].InstanceDataStepRate = 0;
-
-	//ID3D11InputLayout* colorShaderInputLayout;
-	//ThrowIfFailed(device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), colorVertexShaderBuffer->GetBufferPointer(), colorVertexShaderBuffer->GetBufferSize(), &colorShaderInputLayout));
-	//colorVertexShaderBuffer->Release();
-	//colorPixelShaderBuffer->Release();
-
-	//// create the texture shader
-	//ID3D11VertexShader* textureVertexShader = 0;
-	//ID3D11PixelShader* texturePixelShader = 0;
-	//ThrowIfFailed(device->CreateVertexShader(textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), NULL, &textureVertexShader));
-	//ThrowIfFailed(device->CreatePixelShader(texturePixelShaderBuffer->GetBufferPointer(), texturePixelShaderBuffer->GetBufferSize(), NULL, &texturePixelShader));
-	//// this setup needs to match the VertexTextureType stucture in the texture shader
-	//polygonLayout[0].SemanticName = "POSITION";
-	//polygonLayout[0].SemanticIndex = 0;
-	//polygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	//polygonLayout[0].InputSlot = 0;
-	//polygonLayout[0].AlignedByteOffset = 0;
-	//polygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	//polygonLayout[0].InstanceDataStepRate = 0;
-	//polygonLayout[1].SemanticName = "TEXCOORD";
-	//polygonLayout[1].SemanticIndex = 0;
-	//polygonLayout[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-	//polygonLayout[1].InputSlot = 0;
-	//polygonLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-	//polygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	//polygonLayout[1].InstanceDataStepRate = 0;
-
-	//ID3D11InputLayout* textureShaderInputLayout;
-	//ThrowIfFailed(device->CreateInputLayout(polygonLayout, sizeof(polygonLayout) / sizeof(polygonLayout[0]), textureVertexShaderBuffer->GetBufferPointer(), textureVertexShaderBuffer->GetBufferSize(), &textureShaderInputLayout));
-	//textureVertexShaderBuffer->Release();
-	//texturePixelShaderBuffer->Release();
-
-	// create the lit texture
-	//ComPtr<ID3D11VertexShader> litTextureVertexShader;
-	//auto vsBytecode = Read("LitTextureVS.cso");
-	//ThrowIfFailed(device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &litTextureVertexShader));
-
-	//// this needs to match VertexShaderInput in the litTexture shaders
-	//D3D11_INPUT_ELEMENT_DESC textureLitLayout[] = {
-	//		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	//		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	//		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	//};
-	//ID3D11InputLayout* litTextureShaderInputLayout;
-	//ThrowIfFailed(device->CreateInputLayout(textureLitLayout, ARRAYSIZE(textureLitLayout), &vsBytecode[0], vsBytecode.size(), &litTextureShaderInputLayout));
-
-	//ID3D11PixelShader* litTexturePixelShader = 0;
-	//auto psBytecode = Read("LitTexturePS.cso");
-	//ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &litTexturePixelShader));
-
 
 	// create a texture sampler state
 	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	ID3D11SamplerState* samplerState;
-	result = device->CreateSamplerState(&samplerDesc, &samplerState);
+	ThrowIfFailed(device->CreateSamplerState(&samplerDesc, &samplerState));
 
 	// dynamic matrix constant buffer that's in the vertex shaders
 	ID3D11Buffer* matrixBuffer = 0;
@@ -508,38 +400,144 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// make a sphere
 	// note: go to planetpixelemporium for textures
+	//const float TWOPI = 2.f * PI;
+	//unsigned latitudes = 24;
+	//unsigned longitudes = 24;
+	//unsigned vertexCount = (latitudes + 1) * (longitudes + 1);
+	//unsigned indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	//VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
+	//unsigned long* indices = new unsigned long[indexCount];
+	//const float latStep = PI / latitudes;
+	//const float lonStep = TWOPI / longitudes;
+	//unsigned v = 0;
+	//for (unsigned lat = 0; lat <= latitudes; ++lat) {
+	//	for (unsigned lon = 0; lon <= longitudes; ++lon) {
+	//		const float alat = lat * latStep;
+	//		const float alon = lon * lonStep;
+	//		vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
+	//		vertices[v].normal = vertices[v].position;
+	//		vertices[v].normal.w = 0.0f;
+	//		vertices[v++].texture = XMFLOAT2((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f);
+	//	}
+	//}
+	//unsigned index = 0;
+	//for (unsigned lat = 0; lat < latitudes; ++lat) {
+	//	for (unsigned lon = 0; lon < longitudes; ++lon) {
+	//		if (lat != latitudes - 1) {
+	//			indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+	//			indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+	//			indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+	//		}
+	//		if (lat != 0) {
+	//			indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+	//			indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+	//			indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+	//		}
+	//	}
+	//}
+
+	// make a cube sphere
+	// (quadrilateralized spherical cube)
 	const float TWOPI = 2.f * PI;
-	unsigned latitudes = 24;
-	unsigned longitudes = 24;
-	unsigned vertexCount = (latitudes + 1) * (longitudes + 1);
-	unsigned indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	unsigned subdivisions = 8;
+	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
+	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 2 * (subdivisions + 2);
+	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
+	unsigned indexCount = 6 * 3 * 2 * (subdivisions + 1) * (subdivisions + 1);
 	VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
+	struct loc {
+		unsigned x, y, z, s;
+		bool operator<(const loc &o) const {
+			return (x < o.x || (x == o.x && (y < o.y || (y == o.y && (z < o.z || (z == o.z && s < o.s))))));
+		}
+	};
+	map<loc, unsigned> indexRef;
 	unsigned long* indices = new unsigned long[indexCount];
-	const float latStep = PI / latitudes;
-	const float lonStep = TWOPI / longitudes;
 	unsigned v = 0;
-	for (unsigned lat = 0; lat <= latitudes; ++lat) {
-		for (unsigned lon = 0; lon <= longitudes; ++lon) {
-			const float alat = lat * latStep;
-			const float alon = lon * lonStep;
-			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
-			vertices[v].normal = vertices[v].position;
-			vertices[v].normal.w = 0.0f;
-			vertices[v++].texture = XMFLOAT2((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f);
+	float yaw = 0.f;
+	float pitch = 0.f;
+	unsigned w = subdivisions + 1;
+	const float step = 1.f / w;
+	const float third = 1.f / 3.f;
+	loc p;
+	auto setVertex = [&indexRef, &p, &vertices, w, &v] {
+		float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
+		float x2 = x * x, y2 = y * y, z2 = z * z;
+		vertices[v].position = XMFLOAT4(
+			x * sqrt(1.f - y2 / 2.f - z2 / 2.f + y2 * z2 / 3.f),
+			y * sqrt(1.f - x2 / 2.f - z2 / 2.f + x2 * z2 / 3.f),
+			z * sqrt(1.f - x2 / 2.f - y2 / 2.f + x2 * y2 / 3.f),
+			1.f);
+		vertices[v].normal = vertices[v].position;
+		vertices[v].normal.w = 0.0f;
+	};
+	// vertices
+	// left, front, right, back
+	for (unsigned i = 0; i < 4; ++i) {
+		// left, up, down edges of the face and middle, except on the right face, which has a right edge too
+		for (unsigned r = 0; r < w + 1; ++r) {
+			for (unsigned c = 0; c < (i < 2 ? w : w + 1); ++c) {
+				switch (i) {
+					case 0: { p = {0, r, c, 0}; break; }
+					case 1: { p = {c, r, w, 0}; break; }
+					case 2: { p = {w, r, w - c, c == w}; break; }
+					case 3: { p = {w - c, r, 0, c == w}; break; }
+				}
+				indexRef[p] = v;
+				setVertex();
+				// map to the cube texture
+				//  u
+				// lfr
+				//  db
+				vertices[v++].texture = XMFLOAT2(third * min(2, i) + third * step * c, third * (i < 3 ? 1 : 2) + third * step * r);
+			}
 		}
 	}
-	unsigned index = 0;
-	for (unsigned lat = 0; lat < latitudes; ++lat) {
-		for (unsigned lon = 0; lon < longitudes; ++lon) {
-			if (lat != latitudes - 1) {
-				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+	// up, down
+	for (unsigned i = 0; i < 2; ++i) {
+		// no edges, middle only
+		for (unsigned r = 1; r < w; ++r) {
+			for (unsigned c = 1; c < w; ++c) {
+				switch (i) {
+					case 0: { p = {c, 0, r}; break; }
+					case 1: { p = {w - c, w, r}; break; }
+				}
+				indexRef[p] = v;
+				setVertex();
+				// map to the cube texture
+				//  u
+				// lfr
+				//  db
+				vertices[v++].texture = XMFLOAT2(third * 2 + third * step * c, third * 2 * i + third * step * r);
 			}
-			if (lat != 0) {
-				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+		}
+	}
+	// indices
+	unsigned index = 0;
+	// left, front, right, back, up, down
+	const unsigned lfrbVerts = (subdivisions + 1) * (subdivisions + 2);
+	const unsigned fourFaces = lfrbVerts * 4;
+	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
+		unsigned x = 0, y = 0, z = 0, s = 0;
+		switch (i) {
+			case 0: { x = 0, y = r, z = c; break; }
+			case 1: { x = c, y = r, z = w; break; }
+			case 2: { x = w, y = r, z = w - c, s = c == w; break; }
+			case 3: { x = w - c, y = r, z = 0, s = c == w; break; }
+			case 4: { x = c, y = 0, z = r; break;  }
+			case 5: { x = c, y = w, z = w - r; break; }
+		}
+		return indexRef.at({x, y, z, s});
+	};
+	for (unsigned i = 0; i < 6; ++i) {
+		for (unsigned r = 0; r < w; ++r) {
+			for (unsigned c = 0; c < w; ++c) {
+				indices[index++] = getIndex(i, c, r);
+				indices[index++] = getIndex(i, c + 1, r);
+				indices[index++] = getIndex(i, c + 1, r + 1);
+				indices[index++] = indices[index - 3];
+				indices[index++] = indices[index - 2];
+				indices[index++] = getIndex(i, c, r + 1);
 			}
 		}
 	}
@@ -581,7 +579,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// texture
 	// read the targa file
 	FILE* filePtr;
-	assert(fopen_s(&filePtr, "earthmap1k.tga", "rb") == 0);
+	assert(fopen_s(&filePtr, "2x_GlobeCube_2048.tga", "rb") == 0);
 	TargaHeader targaHeader;
 	assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
 	assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
@@ -699,8 +697,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 			// add rotation to the sphere
-			worldMatrix = XMMatrixRotationY(time() * 0.3f);
-
+			worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
+			
 
 			// stage the sphere's buffers as the ones to use
 			// set the vertex buffer to active in the input assembler
