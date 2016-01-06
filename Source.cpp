@@ -439,9 +439,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// make a cube sphere
 	// (quadrilateralized spherical cube)
 	const float TWOPI = 2.f * PI;
-	unsigned subdivisions = 8;
+	unsigned subdivisions = 20;
 	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
-	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 2 * (subdivisions + 2);
+	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 8 * (subdivisions + 2);
 	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
 	unsigned indexCount = 6 * 3 * 2 * (subdivisions + 1) * (subdivisions + 1);
 	VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
@@ -460,63 +460,45 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	const float step = 1.f / w;
 	const float third = 1.f / 3.f;
 	loc p;
-	auto setVertex = [&indexRef, &p, &vertices, w, &v] {
-		float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
-		float x2 = x * x, y2 = y * y, z2 = z * z;
-		vertices[v].position = XMFLOAT4(
-			x * sqrt(1.f - y2 / 2.f - z2 / 2.f + y2 * z2 / 3.f),
-			y * sqrt(1.f - x2 / 2.f - z2 / 2.f + x2 * z2 / 3.f),
-			z * sqrt(1.f - x2 / 2.f - y2 / 2.f + x2 * y2 / 3.f),
-			1.f);
-		vertices[v].normal = vertices[v].position;
-		vertices[v].normal.w = 0.0f;
-	};
 	// vertices
-	// left, front, right, back
-	for (unsigned i = 0; i < 4; ++i) {
-		// left, up, down edges of the face and middle, except on the right face, which has a right edge too
+	// left, front, right, back, up, down
+	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w + 1; ++r) {
-			for (unsigned c = 0; c < (i < 2 ? w : w + 1); ++c) {
+			for (unsigned c = 0; c < w + 1; ++c) {
+				// skip the 4 shared edges in the texture
 				switch (i) {
-					case 0: { p = {0, r, c, 0}; break; }
-					case 1: { p = {c, r, w, 0}; break; }
+					case 0: { if (c == w) continue; p = {0, r, c, 0}; break; }
+					case 1: { if (c == w) continue; p = {c, r, w, 0}; break; }
 					case 2: { p = {w, r, w - c, c == w}; break; }
 					case 3: { p = {w - c, r, 0, c == w}; break; }
+					case 4: { if (r == w) continue; p = {c, 0, r, (c == 0 || c == w || r == 0) * 2}; break; }
+					case 5: { if (r == 0) continue; p = {c, w, w - r, (c == 0 || c == w || r == w) * 2}; break; }
 				}
 				indexRef[p] = v;
-				setVertex();
+				float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
+				float x2 = x * x, y2 = y * y, z2 = z * z;
+				vertices[v].position = XMFLOAT4(
+					x * sqrt(1.f - y2 / 2.f - z2 / 2.f + y2 * z2 / 3.f),
+					y * sqrt(1.f - x2 / 2.f - z2 / 2.f + x2 * z2 / 3.f),
+					z * sqrt(1.f - x2 / 2.f - y2 / 2.f + x2 * y2 / 3.f),
+					1.f);
+				vertices[v].normal = vertices[v].position;
+				vertices[v].normal.w = 0.0f;
 				// map to the cube texture
 				//  u
 				// lfr
 				//  db
-				vertices[v++].texture = XMFLOAT2(third * min(2, i) + third * step * c, third * (i < 3 ? 1 : 2) + third * step * r);
-			}
-		}
-	}
-	// up, down
-	for (unsigned i = 0; i < 2; ++i) {
-		// no edges, middle only
-		for (unsigned r = 1; r < w; ++r) {
-			for (unsigned c = 1; c < w; ++c) {
-				switch (i) {
-					case 0: { p = {c, 0, r}; break; }
-					case 1: { p = {w - c, w, r}; break; }
-				}
-				indexRef[p] = v;
-				setVertex();
-				// map to the cube texture
-				//  u
-				// lfr
-				//  db
-				vertices[v++].texture = XMFLOAT2(third * 2 + third * step * c, third * 2 * i + third * step * r);
+				if (i < 4)
+					vertices[v].texture = XMFLOAT2(third * min(2, i) + third * step * c, third * (i < 3 ? 1 : 2) + third * step * r);
+				else
+					vertices[v].texture = XMFLOAT2(third + third * step * c, third * 2 * (i - 4) + third * step * r);
+				++v;
 			}
 		}
 	}
 	// indices
 	unsigned index = 0;
 	// left, front, right, back, up, down
-	const unsigned lfrbVerts = (subdivisions + 1) * (subdivisions + 2);
-	const unsigned fourFaces = lfrbVerts * 4;
 	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
 		unsigned x = 0, y = 0, z = 0, s = 0;
 		switch (i) {
@@ -524,8 +506,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			case 1: { x = c, y = r, z = w; break; }
 			case 2: { x = w, y = r, z = w - c, s = c == w; break; }
 			case 3: { x = w - c, y = r, z = 0, s = c == w; break; }
-			case 4: { x = c, y = 0, z = r; break;  }
-			case 5: { x = c, y = w, z = w - r; break; }
+			case 4: { x = c, y = 0, z = r, s = (r != w && (c == 0 || c == w || r == 0)) * 2; break;  }
+			case 5: { x = c, y = w, z = w - r, s = (r != 0 && (c == 0 || c == w || r == w)) * 2; break; }
 		}
 		return indexRef.at({x, y, z, s});
 	};
