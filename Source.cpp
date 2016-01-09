@@ -60,7 +60,7 @@ struct VertexTextureType {
 struct VertexShaderInput {
 	XMFLOAT4 position;
 	XMFLOAT4 normal;
-	XMFLOAT2 texture;
+	XMFLOAT3 texture;
 };
 
 struct TargaHeader {
@@ -176,6 +176,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	swapChainDesc.OutputWindow = hWnd;
 	// turn multisampling off
 	swapChainDesc.SampleDesc.Count = 1;
+	unsigned qualityLevels;
+	device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, 2, &qualityLevels);
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.Windowed = windowed;
 	swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
@@ -336,7 +338,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Shader litTexture("LitTextureVS.cso", "LitTexturePS.cso", {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	});
 
 	// create a texture sampler state
@@ -439,9 +441,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// make a cube sphere
 	// (quadrilateralized spherical cube)
 	const float TWOPI = 2.f * PI;
-	unsigned subdivisions = 20;
+	unsigned subdivisions = 9;
 	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
-	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 8 * (subdivisions + 2);
+	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
 	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
 	unsigned indexCount = 6 * 3 * 2 * (subdivisions + 1) * (subdivisions + 1);
 	VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
@@ -458,21 +460,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float pitch = 0.f;
 	unsigned w = subdivisions + 1;
 	const float step = 1.f / w;
-	const float third = 1.f / 3.f;
 	loc p;
 	// vertices
-	// left, front, right, back, up, down
 	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w + 1; ++r) {
 			for (unsigned c = 0; c < w + 1; ++c) {
-				// skip the 4 shared edges in the texture
 				switch (i) {
-					case 0: { if (c == w) continue; p = {0, r, c, 0}; break; }
-					case 1: { if (c == w) continue; p = {c, r, w, 0}; break; }
-					case 2: { p = {w, r, w - c, c == w}; break; }
-					case 3: { p = {w - c, r, 0, c == w}; break; }
-					case 4: { if (r == w) continue; p = {c, 0, r, (c == 0 || c == w || r == 0) * 2}; break; }
-					case 5: { if (r == 0) continue; p = {c, w, w - r, (c == 0 || c == w || r == w) * 2}; break; }
+					case 0: { p = { w, r, w - c, i }; break; } // right
+					case 1: { p = { 0, r, c, i }; break; } // left
+					case 2: { p = { c, 0, r, i }; break; } // up
+					case 3: { p = { c, w, w - r, i }; break; } // down
+					case 4: { p = { c, r, w, i }; break; } // front
+					case 5: { p = { w - c, r, 0, i }; break; } // back
 				}
 				indexRef[p] = v;
 				float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
@@ -484,32 +483,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					1.f);
 				vertices[v].normal = vertices[v].position;
 				vertices[v].normal.w = 0.0f;
-				// map to the cube texture
-				//  u
-				// lfr
-				//  db
-				if (i < 4)
-					vertices[v].texture = XMFLOAT2(third * min(2, i) + third * step * c, third * (i < 3 ? 1 : 2) + third * step * r);
-				else
-					vertices[v].texture = XMFLOAT2(third + third * step * c, third * 2 * (i - 4) + third * step * r);
+				vertices[v].texture = XMFLOAT3(-x, y, z);
 				++v;
 			}
 		}
 	}
 	// indices
 	unsigned index = 0;
-	// left, front, right, back, up, down
 	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
 		unsigned x = 0, y = 0, z = 0, s = 0;
 		switch (i) {
-			case 0: { x = 0, y = r, z = c; break; }
-			case 1: { x = c, y = r, z = w; break; }
-			case 2: { x = w, y = r, z = w - c, s = c == w; break; }
-			case 3: { x = w - c, y = r, z = 0, s = c == w; break; }
-			case 4: { x = c, y = 0, z = r, s = (r != w && (c == 0 || c == w || r == 0)) * 2; break;  }
-			case 5: { x = c, y = w, z = w - r, s = (r != 0 && (c == 0 || c == w || r == w)) * 2; break; }
+			case 0: { x = w, y = r, z = w - c, s = i; break; } // right
+			case 1: { x = 0, y = r, z = c; s = i; break; } // left
+			case 2: { x = c, y = 0, z = r, s = i; break;  } // up
+			case 3: { x = c, y = w, z = w - r, s = i; break; } // down
+			case 4: { x = c, y = r, z = w; s = i; break; } // front
+			case 5: { x = w - c, y = r, z = 0, s = i; break; } // back
 		}
-		return indexRef.at({x, y, z, s});
+		return indexRef.at({ x, y, z, s });
 	};
 	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w; ++r) {
@@ -559,57 +550,72 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	// texture
-	// read the targa file
-	FILE* filePtr;
-	assert(fopen_s(&filePtr, "2x_GlobeCube_2048.tga", "rb") == 0);
+	// read the 6 targa files
+	unsigned char* imageData = nullptr;
+	unsigned char* textureData = nullptr;
+	unsigned imageSize = 0;
+	unsigned textureSize = 0;
+	unsigned bytespp = 0;
 	TargaHeader targaHeader;
-	assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
-	assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
-	unsigned bytespp = targaHeader.bpp / 8;
-	unsigned imageSize = targaHeader.width * targaHeader.height * bytespp;
-	auto targaImage = new unsigned char[imageSize];
-	assert(targaImage);
-	assert((unsigned)fread(targaImage, 1, imageSize, filePtr) == imageSize);
-	assert(fclose(filePtr) == 0);
-	unsigned i = 0;
-	auto targaData = new unsigned char[imageSize / bytespp * 4];
-	// targa stores it upside down, so go through the rows backwards
-	for (int r = (int)targaHeader.height - 1; r >= 0; --r) { // signed because it must become -1
-		for (unsigned j = r * targaHeader.width * bytespp; j < (r + 1) * targaHeader.width * bytespp; j += bytespp) {
-			targaData[i++] = targaImage[j + 2]; // red
-			targaData[i++] = targaImage[j + 1]; // green
-			targaData[i++] = targaImage[j + 0]; // blue
-			targaData[i++] = bytespp == 4 ? targaImage[j + 3] : 0; // alpha
-		}
-	}
-	delete[] targaImage;
-
-	// create the texture
 	D3D11_TEXTURE2D_DESC textureDesc;
-	textureDesc.Height = targaHeader.height;
-	textureDesc.Width = targaHeader.width;
-	textureDesc.MipLevels = 0;
-	textureDesc.ArraySize = 1;
+	textureDesc.ArraySize = 6;
 	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	textureDesc.SampleDesc.Count = 1;
 	textureDesc.SampleDesc.Quality = 0;
 	textureDesc.Usage = D3D11_USAGE_DEFAULT;
 	textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
 	textureDesc.CPUAccessFlags = 0;
-	textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-	ID3D11Texture2D* texture;
-	ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &texture));
-	// copy the image data into the texture
-	context->UpdateSubresource(texture, 0, NULL, targaData, targaHeader.width * 4 * sizeof(unsigned char), 0);
+	textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS | D3D11_RESOURCE_MISC_TEXTURECUBE;
+	ID3D11Texture2D* textureArray;
+	for (int i = 0; i < 6; ++i) {
+		FILE* filePtr;
+		char fileName[40];
+		sprintf_s(fileName, "earth_%c.tga", "rludfb"[i]);
+		assert(fopen_s(&filePtr, fileName, "rb") == 0);
+		if (i == 0) {
+			assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
+			assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
+			bytespp = targaHeader.bpp / 8;
+			imageSize = targaHeader.width * targaHeader.height * bytespp;
+			imageData = new unsigned char[imageSize];
+			assert(imageData);
+			textureSize = targaHeader.width * targaHeader.height * 4;
+			textureData = new unsigned char[textureSize];
+			assert(textureData);
+			textureDesc.Width = targaHeader.width;
+			textureDesc.Height = targaHeader.height;
+			textureDesc.MipLevels = max(ceil(log2(targaHeader.width)), ceil(log2(targaHeader.height)));
+			ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &textureArray));
+		}
+		else {
+			fseek(filePtr, sizeof(TargaHeader), SEEK_SET);
+		}
+		assert((unsigned)fread(imageData, 1, imageSize, filePtr) == imageSize);
+		assert(fclose(filePtr) == 0);
+		unsigned n = 0;
+		// targa stores it upside down, so go through the rows backwards
+		for (int r = (int)targaHeader.height - 1; r >= 0; --r) { // signed because it must become -1
+			for (unsigned j = r * targaHeader.width * bytespp; j < (r + 1) * targaHeader.width * bytespp; j += bytespp) {
+				textureData[n++] = imageData[j + 2]; // red
+				textureData[n++] = imageData[j + 1]; // green
+				textureData[n++] = imageData[j + 0]; // blue
+				textureData[n++] = bytespp == 4 ? imageData[j + 3] : 255; // alpha
+			}
+		}
+		// copy the data to the texture array
+		context->UpdateSubresource(textureArray, D3D11CalcSubresource(0, i, textureDesc.MipLevels), NULL, textureData, targaHeader.width * 4, textureSize);
+	}
+	delete[] imageData;
+	delete[] textureData;
 
 	// create the shader resource view so shaders can read from the texture
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	srvDesc.Format = textureDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.MipLevels = -1;
 	ID3D11ShaderResourceView* textureView;
-	ThrowIfFailed(device->CreateShaderResourceView(texture, &srvDesc, &textureView));
+	ThrowIfFailed(device->CreateShaderResourceView(textureArray, &srvDesc, &textureView));
 
 	// generate mipmaps
 	context->GenerateMips(textureView);
@@ -680,7 +686,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			// add rotation to the sphere
 			worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
-			
+
 
 			// stage the sphere's buffers as the ones to use
 			// set the vertex buffer to active in the input assembler
@@ -729,7 +735,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// the pixel shader just needs material, lighting in its 1, 2 spots
 			context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
 
-			// give the pixel shader the texture
+			// give the pixel shader the cube texture
 			context->PSSetShaderResources(0, 1, &textureView);
 
 			// set the vertex input layout
@@ -771,8 +777,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (d2dFactory) d2dFactory->Release();
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
 	if (textureView) textureView->Release();
-	if (texture) texture->Release();
-	if (targaData) delete[] targaData;
+	if (textureArray) textureArray->Release();
 	if (vertexBuffer) vertexBuffer->Release();
 	if (indexBuffer) indexBuffer->Release();
 	if (samplerState) samplerState->Release();
@@ -803,12 +808,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	// sort through and find what code to run for the message given
 	switch (message) {
 		// this message is read when the window is closed
-	case WM_DESTROY:
-	{
-		// close the application entirely
-		PostQuitMessage(0);
-		return 0;
-	} break;
+		case WM_DESTROY:
+		{
+			// close the application entirely
+			PostQuitMessage(0);
+			return 0;
+		} break;
 	}
 
 	// handle any messages that the switch statement didn't

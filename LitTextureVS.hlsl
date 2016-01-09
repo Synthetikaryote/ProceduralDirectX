@@ -21,11 +21,11 @@ cbuffer LightingBuffer : register(b2) {
 struct VertexShaderInput {
     float4 position : POSITION;
     float4 normal : NORMAL;
-    float2 tex : TEXCOORD0;
+    float3 tex : TEXCOORD0;
 };
 struct VertexShaderOutput {
     float4 position : SV_POSITION;
-    float2 tex : TEXCOORD0;
+    float3 tex : TEXCOORD0;
     float3 normal : TEXCOORD1;
     float3 dirToLight : TEXCOORD2;
     float3 dirToView : TEXCOORD3;
