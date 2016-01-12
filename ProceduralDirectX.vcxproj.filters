@@ -4,6 +4,9 @@
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="Uber.cpp" />
+    <ClCompile Include="Resource.cpp" />
+    <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="color.vs" />
@@ -18,5 +21,8 @@
   <ItemGroup>
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Uber.h" />
+    <ClInclude Include="Resource.h" />
+    <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="Texture.h" />
   </ItemGroup>
 </Project>

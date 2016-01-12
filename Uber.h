@@ -5,6 +5,7 @@
 #include <chrono>
 #include <vector>
 #include <wrl.h>
+#include "ResourceManager.h"
 
 using namespace std;
 using namespace Microsoft::WRL;
@@ -36,4 +37,5 @@ public:
 	void operator=(Uber const&) = delete;
 
 	ComPtr<ID3D11Device> device;
+	ResourceManager* resourceManager;
 };

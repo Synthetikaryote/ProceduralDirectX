@@ -334,6 +334,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create an orthographic projection matrix for 2D UI rendering.
 	XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
 
+	// create the resource manager
+	Uber::I().resourceManager = new ResourceManager();
+
 	// shaders
 	Shader litTexture("LitTextureVS.cso", "LitTexturePS.cso", {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -342,7 +345,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	});
 
 	// create a texture sampler state
-	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
+	D3D11_SAMPLER_DESC samplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
 	ID3D11SamplerState* samplerState;
 	ThrowIfFailed(device->CreateSamplerState(&samplerDesc, &samplerState));
 
@@ -441,7 +444,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// make a cube sphere
 	// (quadrilateralized spherical cube)
 	const float TWOPI = 2.f * PI;
-	unsigned subdivisions = 9;
+	unsigned subdivisions = 19;
 	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
 	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
 	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
@@ -771,6 +774,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// clean up
+	Uber::I().resourceManager->Terminate();
+	delete Uber::I().resourceManager;
 	if (whiteBrush) whiteBrush->Release();
 	if (d2dContext) d2dContext->Release();
 	if (d2dDevice) d2dDevice->Release();
