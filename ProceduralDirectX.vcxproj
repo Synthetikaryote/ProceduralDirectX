@@ -69,10 +69,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Resource.cpp" />
-    <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="Source.cpp" />
-    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Uber.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -95,12 +93,18 @@
       </DisableOptimizations>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</EnableDebuggingInformation>
     </FxCompile>
+    <ClCompile Include="Texture.cpp">
+      <FileType>Document</FileType>
+    </ClCompile>
     <None Include="texture.vs" />
     <None Include="texture.ps" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Resource.h" />
     <ClInclude Include="ResourceManager.h" />
+    <ClCompile Include="ResourceManager.cpp">
+      <FileType>CppHeader</FileType>
+    </ClCompile>
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Uber.h" />

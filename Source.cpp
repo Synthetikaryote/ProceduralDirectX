@@ -587,7 +587,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			assert(textureData);
 			textureDesc.Width = targaHeader.width;
 			textureDesc.Height = targaHeader.height;
-			textureDesc.MipLevels = max(ceil(log2(targaHeader.width)), ceil(log2(targaHeader.height)));
+			textureDesc.MipLevels = (unsigned)max(ceil(log2(targaHeader.width)), ceil(log2(targaHeader.height)));
 			ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &textureArray));
 		}
 		else {

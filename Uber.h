@@ -21,6 +21,12 @@ float time();
 // Read a file in binary and return a vector of bytes
 vector<uint8_t> Read(string path);
 
+// Hash combiner
+template <class T>
+inline void hash_combine(size_t& seed, const T& v) {
+	 seed ^= hash<T>()(v) +0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
 // singleton pattern from http://stackoverflow.com/questions/1008019/c-singleton-design-pattern
 class Uber {
 public:
