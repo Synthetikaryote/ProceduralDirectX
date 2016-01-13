@@ -20,6 +20,7 @@
 
 #include "Uber.h"
 #include "Shader.h"
+#include "Texture.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -61,14 +62,6 @@ struct VertexShaderInput {
 	XMFLOAT4 position;
 	XMFLOAT4 normal;
 	XMFLOAT3 texture;
-};
-
-struct TargaHeader {
-	unsigned char data1[12];
-	unsigned short width;
-	unsigned short height;
-	unsigned char bpp;
-	unsigned char data2;
 };
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -145,6 +138,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 	ComPtr<ID3D11Device>& device = Uber::I().device;
 	D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, flags, featureLevels, ARRAYSIZE(featureLevels), D3D11_SDK_VERSION, &device, NULL, &context);
+	Uber::I().context = context;
 
 	// create a direct2d device and context
 	D2D1_FACTORY_OPTIONS d2dOptions;
@@ -553,76 +547,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	// texture
-	// read the 6 targa files
-	unsigned char* imageData = nullptr;
-	unsigned char* textureData = nullptr;
-	unsigned imageSize = 0;
-	unsigned textureSize = 0;
-	unsigned bytespp = 0;
-	TargaHeader targaHeader;
-	D3D11_TEXTURE2D_DESC textureDesc;
-	textureDesc.ArraySize = 6;
-	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	textureDesc.SampleDesc.Count = 1;
-	textureDesc.SampleDesc.Quality = 0;
-	textureDesc.Usage = D3D11_USAGE_DEFAULT;
-	textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-	textureDesc.CPUAccessFlags = 0;
-	textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS | D3D11_RESOURCE_MISC_TEXTURECUBE;
-	ID3D11Texture2D* textureArray;
+	vector<string> paths(6);
 	for (int i = 0; i < 6; ++i) {
-		FILE* filePtr;
 		char fileName[40];
 		sprintf_s(fileName, "earth_%c.tga", "rludfb"[i]);
-		assert(fopen_s(&filePtr, fileName, "rb") == 0);
-		if (i == 0) {
-			assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
-			assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
-			bytespp = targaHeader.bpp / 8;
-			imageSize = targaHeader.width * targaHeader.height * bytespp;
-			imageData = new unsigned char[imageSize];
-			assert(imageData);
-			textureSize = targaHeader.width * targaHeader.height * 4;
-			textureData = new unsigned char[textureSize];
-			assert(textureData);
-			textureDesc.Width = targaHeader.width;
-			textureDesc.Height = targaHeader.height;
-			textureDesc.MipLevels = (unsigned)max(ceil(log2(targaHeader.width)), ceil(log2(targaHeader.height)));
-			ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &textureArray));
-		}
-		else {
-			fseek(filePtr, sizeof(TargaHeader), SEEK_SET);
-		}
-		assert((unsigned)fread(imageData, 1, imageSize, filePtr) == imageSize);
-		assert(fclose(filePtr) == 0);
-		unsigned n = 0;
-		// targa stores it upside down, so go through the rows backwards
-		for (int r = (int)targaHeader.height - 1; r >= 0; --r) { // signed because it must become -1
-			for (unsigned j = r * targaHeader.width * bytespp; j < (r + 1) * targaHeader.width * bytespp; j += bytespp) {
-				textureData[n++] = imageData[j + 2]; // red
-				textureData[n++] = imageData[j + 1]; // green
-				textureData[n++] = imageData[j + 0]; // blue
-				textureData[n++] = bytespp == 4 ? imageData[j + 3] : 255; // alpha
-			}
-		}
-		// copy the data to the texture array
-		context->UpdateSubresource(textureArray, D3D11CalcSubresource(0, i, textureDesc.MipLevels), NULL, textureData, targaHeader.width * 4, textureSize);
+		paths[i] = string(fileName);
 	}
-	delete[] imageData;
-	delete[] textureData;
-
-	// create the shader resource view so shaders can read from the texture
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-	srvDesc.Format = textureDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = -1;
-	ID3D11ShaderResourceView* textureView;
-	ThrowIfFailed(device->CreateShaderResourceView(textureArray, &srvDesc, &textureView));
-
-	// generate mipmaps
-	context->GenerateMips(textureView);
-
+	auto* worldTexture = Texture::LoadCube(paths);
 
 	// text
 	// create a white brush
@@ -739,7 +670,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
 
 			// give the pixel shader the cube texture
-			context->PSSetShaderResources(0, 1, &textureView);
+			context->PSSetShaderResources(0, 1, &worldTexture->shaderResourceView);
 
 			// set the vertex input layout
 			context->IASetInputLayout(litTexture.inputLayout);
@@ -774,6 +705,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// clean up
+	worldTexture->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
 	if (whiteBrush) whiteBrush->Release();
@@ -781,8 +713,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (d2dDevice) d2dDevice->Release();
 	if (d2dFactory) d2dFactory->Release();
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
-	if (textureView) textureView->Release();
-	if (textureArray) textureArray->Release();
 	if (vertexBuffer) vertexBuffer->Release();
 	if (indexBuffer) indexBuffer->Release();
 	if (samplerState) samplerState->Release();

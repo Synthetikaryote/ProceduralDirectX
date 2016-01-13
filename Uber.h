@@ -43,5 +43,6 @@ public:
 	void operator=(Uber const&) = delete;
 
 	ComPtr<ID3D11Device> device;
+	ID3D11DeviceContext* context;
 	ResourceManager* resourceManager;
 };

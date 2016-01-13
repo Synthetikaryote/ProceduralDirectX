@@ -1,6 +1,7 @@
 #pragma once
 #include "Resource.h"
 #include <map>
+#include <functional>
 using namespace std;
 
 class ResourceManager {
@@ -15,6 +16,8 @@ public:
 	T* GetAsset(unsigned key);
 	template <class T>
 	void SaveAsset(unsigned key, T* res);
+	template <class T>
+	T* Load(unsigned key, function<T*()> create);
 
 	void Terminate();
 };
@@ -38,4 +41,15 @@ void ResourceManager::SaveAsset(unsigned key, T* res) {
 	assets[key] = res;
 	res->AddRef(); // resource manager's reference
 	res->AddRef(); // user's reference
+}
+
+template <class T>
+T* ResourceManager::Load(unsigned key, function<T*()> create) {
+	T* t = GetAsset<Texture>(key);
+	if (!t) {
+		t = create();
+		assert(t);
+		SaveAsset<Texture>(key, t);
+	}
+	return t;
 }

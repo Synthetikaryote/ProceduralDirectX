@@ -1,3 +1,4 @@
+#include "ResourceManager.h"
 #include "Texture.h"
 #include <vector>
 #include <cassert>
@@ -11,6 +12,6 @@ ResourceManager::~ResourceManager() {}
 void ResourceManager::Terminate() {
 	for (auto kv : assets) {
 		assert(kv.second->refCount == 1);
-		delete kv.second;
+		kv.second->Release();
 	}
 }
