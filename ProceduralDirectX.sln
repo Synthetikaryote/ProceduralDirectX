@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30501.0
+VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProceduralDirectX", "ProceduralDirectX.vcxproj", "{C64CE77C-68EE-4DC9-86AD-A64B796C8CD6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ModelImporter", "ModelImporter\ModelImporter.vcxproj", "{65E7FC05-497E-42F0-8718-7995B8D10A75}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{C64CE77C-68EE-4DC9-86AD-A64B796C8CD6}.Debug|Win32.Build.0 = Debug|Win32
 		{C64CE77C-68EE-4DC9-86AD-A64B796C8CD6}.Release|Win32.ActiveCfg = Release|Win32
 		{C64CE77C-68EE-4DC9-86AD-A64B796C8CD6}.Release|Win32.Build.0 = Release|Win32
+		{65E7FC05-497E-42F0-8718-7995B8D10A75}.Debug|Win32.ActiveCfg = Debug|Win32
+		{65E7FC05-497E-42F0-8718-7995B8D10A75}.Debug|Win32.Build.0 = Debug|Win32
+		{65E7FC05-497E-42F0-8718-7995B8D10A75}.Release|Win32.ActiveCfg = Release|Win32
+		{65E7FC05-497E-42F0-8718-7995B8D10A75}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

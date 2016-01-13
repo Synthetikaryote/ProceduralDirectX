@@ -570,7 +570,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
 
 
-
 	// main loop
 	MSG msg = { 0 };
 	unsigned framesDrawn = 0;
