@@ -645,7 +645,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			yaw = fmodf(yaw + sensitivity * Uber::I().mouseState.lX, TWOPI);
 			pitch = max(-PI * 0.5f, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), PI * 0.5f));
 
-			float speed = 4.f;
+			float speed = 2.f;
 			float x = 0.f, y = 0.f, z = 0.f;
 			x = (Uber::IsKeyDown(DIK_S) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_F) ? 1.f : 0.f);
 			y = (Uber::IsKeyDown(DIK_LCONTROL) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_SPACE) ? 1.f : 0.f);
