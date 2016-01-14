@@ -69,6 +69,7 @@ struct VertexShaderInput {
 	XMFLOAT3 texture;
 };
 
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // the entry point for any Windows program
@@ -549,6 +550,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMFLOAT3 rotation(0.f, 0.f, 0.f);
 	XMFLOAT3 up(0.f, 1.f, 0.f);
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
+	XMFLOAT3 velocity(0.f, 0.f, 0.f);
+	yaw = 0.f, pitch = 0.f;
 
 
 	// texture
@@ -623,7 +626,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
 			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
 				keyboard->Acquire();
-			result = keyboard->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
+			result = mouse->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
 			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
 				mouse->Acquire();
 			Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
@@ -632,6 +635,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// escape to quit
 			if (Uber::IsKeyDown(DIK_ESCAPE))
 				break;
+
+			const float sensitivity = 0.002f;
+			yaw = fmodf(yaw + sensitivity * Uber::I().mouseState.lX, TWOPI);
+			pitch = max(-PI * 0.5f, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), PI * 0.5f));
+
+			float speed = 4.f;
+			float x = 0.f, y = 0.f, z = 0.f;
+			x = (Uber::IsKeyDown(DIK_S) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_F) ? 1.f : 0.f);
+			y = (Uber::IsKeyDown(DIK_LCONTROL) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_SPACE) ? 1.f : 0.f);
+			z = (Uber::IsKeyDown(DIK_D) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_E) ? 1.f : 0.f);
+			float lenSq = x * x + y * y + z * z;
+			if (lenSq > 0.f) {
+				float lenInv = 1.f / sqrt(lenSq);
+				x *= lenInv; y *= lenInv; z *= lenInv;
+				float py = y * cos(pitch) - z * sin(pitch), pz = y * sin(pitch) + z * cos(pitch);
+				float yx = x * cos(yaw) + pz * sin(yaw), yz = -x * sin(yaw) + pz * cos(yaw);
+				x = yx; y = py; z = yz;
+				float mult = speed * elapsed;
+				x *= mult; y *= mult; z *= mult;
+				position.x += x; position.y += y; position.z += z;
+			}
+
 
 			// bind the render target view and depth stencil buffer to the output render pipeline
 			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
@@ -645,7 +670,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			XMVECTOR upVector = XMLoadFloat3(&up);
 			XMVECTOR lookAtVector = XMLoadFloat3(&forward);
 			XMVECTOR positionVector = XMLoadFloat3(&position);
-			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(rotation.x, rotation.y, rotation.z);
+			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(pitch, yaw, 0.f);
 			// rotate the forward and up according to the camera rotation
 			lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
 			upVector = XMVector3TransformCoord(upVector, rotationMatrix);
@@ -656,7 +681,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 			// add rotation to the sphere
-			worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
+			//worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
 
 
 			// stage the sphere's buffers as the ones to use
