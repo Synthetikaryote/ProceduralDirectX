@@ -69,7 +69,7 @@ struct VertexShaderInput {
 	XMFLOAT3 texture;
 };
 
-
+POINT savedMousePos;
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // the entry point for any Windows program
@@ -87,9 +87,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = WindowProc;
 	wc.hInstance = hInstance;
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.hCursor = NULL; // LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	wc.lpszClassName = L"WindowClass1";
+	ShowCursor(false);
 
 	// register the window class
 	RegisterClassEx(&wc);
@@ -596,7 +597,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(mouse->Acquire());
 
 
-
 	// main loop
 	MSG msg = { 0 };
 	unsigned framesDrawn = 0;
@@ -631,6 +631,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				mouse->Acquire();
 			Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
 			Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
+			if (GetActiveWindow() == hWnd) {
+				RECT r;
+				GetWindowRect(hWnd, &r);
+				SetCursorPos((r.right - r.left) * 0.5f, (r.bottom - r.top) * 0.5f);
+			}
 
 			// escape to quit
 			if (Uber::IsKeyDown(DIK_ESCAPE))
@@ -819,6 +824,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			PostQuitMessage(0);
 			return 0;
 		} break;
+		case WM_SETFOCUS:
+			GetCursorPos(&savedMousePos);
+			break;
+		case WM_KILLFOCUS:
+			SetCursorPos(savedMousePos.x, savedMousePos.y);
+			break;
 	}
 
 	// handle any messages that the switch statement didn't
