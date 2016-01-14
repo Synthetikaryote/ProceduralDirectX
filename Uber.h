@@ -6,6 +6,7 @@
 #include <vector>
 #include <wrl.h>
 #include "ResourceManager.h"
+#include <dinput.h>
 
 using namespace std;
 using namespace Microsoft::WRL;
@@ -24,7 +25,7 @@ vector<uint8_t> Read(string path);
 // Hash combiner
 template <class T>
 inline void hash_combine(size_t& seed, const T& v) {
-	 seed ^= hash<T>()(v) +0x9e3779b9 + (seed << 6) + (seed >> 2);
+	seed ^= hash<T>()(v)+0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
 // singleton pattern from http://stackoverflow.com/questions/1008019/c-singleton-design-pattern
@@ -45,4 +46,9 @@ public:
 	ComPtr<ID3D11Device> device;
 	ID3D11DeviceContext* context;
 	ResourceManager* resourceManager;
+	unsigned char keyboardState[256];
+	DIMOUSESTATE mouseState;
+	int mouseX = 0, mouseY = 0;
+
+	static bool IsKeyDown(unsigned char);
 };

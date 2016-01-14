@@ -26,6 +26,11 @@
 #include <d2d1_2.h>
 #include <dwrite.h>
 
+// input
+#include <dinput.h>
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
 using namespace DirectX;
 using namespace std;
 using namespace Microsoft::WRL;
@@ -339,7 +344,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	});
 
 	// create a texture sampler state
-	D3D11_SAMPLER_DESC samplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
+	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	ID3D11SamplerState* samplerState;
 	ThrowIfFailed(device->CreateSamplerState(&samplerDesc, &samplerState));
 
@@ -570,6 +575,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
 
 
+	// input
+	// keyboard
+	IDirectInput8* directInput;
+	ThrowIfFailed(DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, NULL));
+	IDirectInputDevice8* keyboard;
+	ThrowIfFailed(directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL));
+	ThrowIfFailed(keyboard->SetDataFormat(&c_dfDIKeyboard));
+	ThrowIfFailed(keyboard->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE));
+	ThrowIfFailed(keyboard->Acquire());
+
+	// mouse
+	IDirectInputDevice8* mouse;
+	ThrowIfFailed(directInput->CreateDevice(GUID_SysMouse, &mouse, NULL));
+	ThrowIfFailed(mouse->SetDataFormat(&c_dfDIMouse));
+	ThrowIfFailed(mouse->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
+	ThrowIfFailed(mouse->Acquire());
+
+
+
 	// main loop
 	MSG msg = { 0 };
 	unsigned framesDrawn = 0;
@@ -594,6 +618,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		else {
 			float elapsed = time() - lastFrameTime;
 			lastFrameTime = time();
+
+			// read the input
+			HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
+			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
+				keyboard->Acquire();
+			result = keyboard->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
+			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
+				mouse->Acquire();
+			Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
+			Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
+
+			// escape to quit
+			if (Uber::IsKeyDown(DIK_ESCAPE))
+				break;
 
 			// bind the render target view and depth stencil buffer to the output render pipeline
 			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
@@ -704,6 +742,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	// clean up
+	mouse->Unacquire();
+	mouse->Release();
+	mouse = nullptr;
+	keyboard->Unacquire();
+	keyboard->Release();
+	keyboard = nullptr;
+	directInput->Release();
+	directInput = nullptr;
 	worldTexture->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;

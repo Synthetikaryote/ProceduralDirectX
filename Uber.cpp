@@ -26,3 +26,7 @@ vector<uint8_t> Read(string path) {
 	}
 	return data;
 };
+
+bool Uber::IsKeyDown(unsigned char vk) {
+	return Uber::I().keyboardState[vk] & 0x80;
+}
