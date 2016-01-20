@@ -30,6 +30,6 @@ public:
 	unsigned indexCount = 0;
 	ID3D11Buffer* vertexBuffer;
 	ID3D11Buffer* indexBuffer;
-	static Mesh* Mesh::LoadCubeSphere(unsigned subdivisions = 2);
+	static Mesh* Mesh::LoadCubeSphere(unsigned gridSize = 10);
 };
 

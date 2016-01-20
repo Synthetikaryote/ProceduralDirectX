@@ -1,7 +1,7 @@
 #include "Mesh.h"
 #include "Uber.h"
 
-Mesh* GenerateCubeSphere(unsigned subdivisions = 2);
+Mesh* GenerateCubeSphere(unsigned gridSize);
 
 Mesh::Mesh() {
 }
@@ -12,22 +12,83 @@ Mesh::~Mesh() {
 	if (indexBuffer) indexBuffer->Release();
 }
 
-Mesh* Mesh::LoadCubeSphere(unsigned subdivisions) {
+Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
 	char keyString[40];
-	sprintf_s(keyString, "MeshCubeSphere%u", subdivisions);
+	sprintf_s(keyString, "MeshCubeSphere%u", gridSize);
 	size_t key = hash<string>()(string(keyString));
 
-	return Uber::I().resourceManager->Load<Mesh>(key, [subdivisions] {
-		return GenerateCubeSphere(subdivisions);
+	return Uber::I().resourceManager->Load<Mesh>(key, [gridSize] {
+		return GenerateCubeSphere(gridSize);
 	});
 }
-Mesh* GenerateCubeSphere(unsigned subdivisions) {
+
+//// make a triangle
+//unsigned vertexCount = 3;
+//unsigned indexCount = 3;
+//VertexTextureType* vertices = new VertexTextureType[vertexCount];
+//unsigned long* indices = new unsigned long[indexCount];
+//vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // bottom left
+//vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
+////vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+//vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // top middle
+//vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
+////vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+//vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // bottom right
+//vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
+////vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+//indices[0] = 0;  // bottom left
+//indices[1] = 1;  // top middle
+//indices[2] = 2;  // bottom right
+
+// make a sphere
+Mesh* GenerateSphere(unsigned latitudes, unsigned longitudes) {
 	Mesh* mesh = new Mesh();
-	// (quadrilateralized spherical cube)
+	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
+	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	VertexShaderInput* vertices = new VertexShaderInput[mesh->vertexCount];
+	unsigned long* indices = new unsigned long[mesh->indexCount];
+	const float latStep = PI / latitudes;
+	const float lonStep = TWOPI / longitudes;
+	unsigned v = 0;
+	for (unsigned lat = 0; lat <= latitudes; ++lat) {
+		for (unsigned lon = 0; lon <= longitudes; ++lon) {
+			const float alat = lat * latStep;
+			const float alon = lon * lonStep;
+			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
+			vertices[v].normal = vertices[v].position;
+			vertices[v].normal.w = 0.0f;
+			vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
+		}
+	}
+	unsigned index = 0;
+	for (unsigned lat = 0; lat < latitudes; ++lat) {
+		for (unsigned lon = 0; lon < longitudes; ++lon) {
+			if (lat != latitudes - 1) {
+				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+			}
+			if (lat != 0) {
+				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+			}
+		}
+	}
+}
+
+
+// private functions
+
+// (quadrilateralized spherical cube)
+Mesh* GenerateCubeSphere(unsigned gridSize) {
+	assert(gridSize > 0);
+	Mesh* mesh = new Mesh();
+	unsigned subdivisions = gridSize - 1;
 	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
 	mesh->vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
-	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
-	mesh->indexCount = 6 * 3 * 2 * (subdivisions + 1) * (subdivisions + 1);
+	// for each face, there are 3 indices per triangle, 2 triangles per quad, and gridSize^2 quads
+	mesh->indexCount = 6 * 3 * 2 * gridSize * gridSize;
 	VertexShaderInput* vertices = new VertexShaderInput[mesh->vertexCount];
 	struct loc {
 		unsigned x, y, z, s;
@@ -40,7 +101,7 @@ Mesh* GenerateCubeSphere(unsigned subdivisions) {
 	unsigned v = 0;
 	float yaw = 0.f;
 	float pitch = 0.f;
-	unsigned w = subdivisions + 1;
+	unsigned w = gridSize;
 	const float step = 1.f / w;
 	loc p;
 	// vertices
@@ -73,16 +134,16 @@ Mesh* GenerateCubeSphere(unsigned subdivisions) {
 	// indices
 	unsigned index = 0;
 	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
-		unsigned x = 0, y = 0, z = 0, s = 0;
+		unsigned x = 0, y = 0, z = 0;
 		switch (i) {
-			case 0: { x = w, y = r, z = w - c, s = i; break; } // right
-			case 1: { x = 0, y = r, z = c; s = i; break; } // left
-			case 2: { x = c, y = 0, z = r, s = i; break;  } // up
-			case 3: { x = c, y = w, z = w - r, s = i; break; } // down
-			case 4: { x = c, y = r, z = w; s = i; break; } // front
-			case 5: { x = w - c, y = r, z = 0, s = i; break; } // back
+			case 0: { x = w, y = r, z = w - c; break; } // right
+			case 1: { x = 0, y = r, z = c; break; } // left
+			case 2: { x = c, y = 0, z = r; break;  } // up
+			case 3: { x = c, y = w, z = w - r; break; } // down
+			case 4: { x = c, y = r, z = w; break; } // front
+			case 5: { x = w - c, y = r, z = 0; break; } // back
 		}
-		return indexRef.at({x, y, z, s});
+		return indexRef.at({x, y, z, i});
 	};
 	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w; ++r) {

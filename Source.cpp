@@ -310,7 +310,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float fieldOfView = PI / 4.0f;
 	float screenAspect = (float)screenWidth / (float)screenHeight;
 	float screenDepth = 1000.0f;
-	float screenNear = 0.1f;
+	float screenNear = 0.01f;
 	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, screenAspect, screenNear, screenDepth);
 
 	// create the world matrix
@@ -370,63 +370,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// put all the buffers in an ordered array
 	ID3D11Buffer* constantBuffers[] = { matrixBuffer, materialBuffer, lightingBuffer };
 
-	//// make a triangle
-	//unsigned vertexCount = 3;
-	//unsigned indexCount = 3;
-	//VertexTextureType* vertices = new VertexTextureType[vertexCount];
-	//unsigned long* indices = new unsigned long[indexCount];
-	//vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // bottom left
-	//vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
-	////vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	//vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // top middle
-	//vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
-	////vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	//vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // bottom right
-	//vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
-	////vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	//indices[0] = 0;  // bottom left
-	//indices[1] = 1;  // top middle
-	//indices[2] = 2;  // bottom right
-
-	// make a sphere
-	// note: go to planetpixelemporium for textures
-	//unsigned latitudes = 24;
-	//unsigned longitudes = 24;
-	//unsigned vertexCount = (latitudes + 1) * (longitudes + 1);
-	//unsigned indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
-	//VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
-	//unsigned long* indices = new unsigned long[indexCount];
-	//const float latStep = PI / latitudes;
-	//const float lonStep = TWOPI / longitudes;
-	//unsigned v = 0;
-	//for (unsigned lat = 0; lat <= latitudes; ++lat) {
-	//	for (unsigned lon = 0; lon <= longitudes; ++lon) {
-	//		const float alat = lat * latStep;
-	//		const float alon = lon * lonStep;
-	//		vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
-	//		vertices[v].normal = vertices[v].position;
-	//		vertices[v].normal.w = 0.0f;
-	//		vertices[v++].texture = XMFLOAT2((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f);
-	//	}
-	//}
-	//unsigned index = 0;
-	//for (unsigned lat = 0; lat < latitudes; ++lat) {
-	//	for (unsigned lon = 0; lon < longitudes; ++lon) {
-	//		if (lat != latitudes - 1) {
-	//			indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-	//			indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-	//			indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
-	//		}
-	//		if (lat != 0) {
-	//			indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-	//			indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-	//			indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-	//		}
-	//	}
-	//}
-
 	// make a cube sphere
-	Mesh* cubeSphere = Mesh::LoadCubeSphere(19);
+	Mesh* cubeSphere = Mesh::LoadCubeSphere(20);
 
 	// set up the camera
 	XMFLOAT3 position(0.f, 0.f, -3.f);
@@ -438,6 +383,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	// texture
+	// note: go to planetpixelemporium for textures
 	vector<string> paths(6);
 	for (int i = 0; i < 6; ++i) {
 		char fileName[40];
