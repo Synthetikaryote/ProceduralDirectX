@@ -45,11 +45,11 @@ void ResourceManager::SaveAsset(unsigned key, T* res) {
 
 template <class T>
 T* ResourceManager::Load(unsigned key, function<T*()> create) {
-	T* t = GetAsset<Texture>(key);
+	T* t = GetAsset<T>(key);
 	if (!t) {
 		t = create();
 		assert(t);
-		SaveAsset<Texture>(key, t);
+		SaveAsset<T>(key, t);
 	}
 	return t;
 }

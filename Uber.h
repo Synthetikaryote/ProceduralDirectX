@@ -11,6 +11,11 @@
 using namespace std;
 using namespace Microsoft::WRL;
 
+// constants
+const float PI = 3.14159265358979f;
+const float TWOPI = 2.f * PI;
+const float HALFPI = 0.5f * PI;
+
 // global functions
 
 // convert DirectX error codes to exceptions

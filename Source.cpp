@@ -21,6 +21,7 @@
 #include "Uber.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "Mesh.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -51,22 +52,6 @@ struct LightingBufferType {
 	XMFLOAT4 lightAmbient;
 	XMFLOAT4 lightDiffuse;
 	XMFLOAT4 lightSpecular;
-};
-
-struct VertexColorType {
-	XMFLOAT3 position;
-	XMFLOAT4 color;
-};
-
-struct VertexTextureType {
-	XMFLOAT3 position;
-	XMFLOAT2 texture;
-};
-
-struct VertexShaderInput {
-	XMFLOAT4 position;
-	XMFLOAT4 normal;
-	XMFLOAT3 texture;
 };
 
 POINT savedMousePos;
@@ -322,7 +307,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	d2dContext->SetDpi(dpiX, dpiY);
 
 	// create the projection matrix
-	const float PI = 3.14159265358979f;
 	float fieldOfView = PI / 4.0f;
 	float screenAspect = (float)screenWidth / (float)screenHeight;
 	float screenDepth = 1000.0f;
@@ -406,7 +390,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// make a sphere
 	// note: go to planetpixelemporium for textures
-	//const float TWOPI = 2.f * PI;
 	//unsigned latitudes = 24;
 	//unsigned longitudes = 24;
 	//unsigned vertexCount = (latitudes + 1) * (longitudes + 1);
@@ -443,108 +426,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 
 	// make a cube sphere
-	// (quadrilateralized spherical cube)
-	const float TWOPI = 2.f * PI;
-	unsigned subdivisions = 19;
-	// base cube's 8 vertices + the subdivisions on each edge + the subdivisions in each face + special edges for uv fixing
-	unsigned vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
-	// for each face, there are 3 indices per triangle, 2 triangles per quad, and (subdivisions + 1)^2 quads
-	unsigned indexCount = 6 * 3 * 2 * (subdivisions + 1) * (subdivisions + 1);
-	VertexShaderInput* vertices = new VertexShaderInput[vertexCount];
-	struct loc {
-		unsigned x, y, z, s;
-		bool operator<(const loc &o) const {
-			return (x < o.x || (x == o.x && (y < o.y || (y == o.y && (z < o.z || (z == o.z && s < o.s))))));
-		}
-	};
-	map<loc, unsigned> indexRef;
-	unsigned long* indices = new unsigned long[indexCount];
-	unsigned v = 0;
-	float yaw = 0.f;
-	float pitch = 0.f;
-	unsigned w = subdivisions + 1;
-	const float step = 1.f / w;
-	loc p;
-	// vertices
-	for (unsigned i = 0; i < 6; ++i) {
-		for (unsigned r = 0; r < w + 1; ++r) {
-			for (unsigned c = 0; c < w + 1; ++c) {
-				switch (i) {
-					case 0: { p = { w, r, w - c, i }; break; } // right
-					case 1: { p = { 0, r, c, i }; break; } // left
-					case 2: { p = { c, 0, r, i }; break; } // up
-					case 3: { p = { c, w, w - r, i }; break; } // down
-					case 4: { p = { c, r, w, i }; break; } // front
-					case 5: { p = { w - c, r, 0, i }; break; } // back
-				}
-				indexRef[p] = v;
-				float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
-				float x2 = x * x, y2 = y * y, z2 = z * z;
-				vertices[v].position = XMFLOAT4(
-					x * sqrt(1.f - y2 / 2.f - z2 / 2.f + y2 * z2 / 3.f),
-					y * sqrt(1.f - x2 / 2.f - z2 / 2.f + x2 * z2 / 3.f),
-					z * sqrt(1.f - x2 / 2.f - y2 / 2.f + x2 * y2 / 3.f),
-					1.f);
-				vertices[v].normal = vertices[v].position;
-				vertices[v].normal.w = 0.0f;
-				vertices[v].texture = XMFLOAT3(-x, y, z);
-				++v;
-			}
-		}
-	}
-	// indices
-	unsigned index = 0;
-	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
-		unsigned x = 0, y = 0, z = 0, s = 0;
-		switch (i) {
-			case 0: { x = w, y = r, z = w - c, s = i; break; } // right
-			case 1: { x = 0, y = r, z = c; s = i; break; } // left
-			case 2: { x = c, y = 0, z = r, s = i; break;  } // up
-			case 3: { x = c, y = w, z = w - r, s = i; break; } // down
-			case 4: { x = c, y = r, z = w; s = i; break; } // front
-			case 5: { x = w - c, y = r, z = 0, s = i; break; } // back
-		}
-		return indexRef.at({ x, y, z, s });
-	};
-	for (unsigned i = 0; i < 6; ++i) {
-		for (unsigned r = 0; r < w; ++r) {
-			for (unsigned c = 0; c < w; ++c) {
-				indices[index++] = getIndex(i, c, r);
-				indices[index++] = getIndex(i, c + 1, r);
-				indices[index++] = getIndex(i, c + 1, r + 1);
-				indices[index++] = indices[index - 3];
-				indices[index++] = indices[index - 2];
-				indices[index++] = getIndex(i, c, r + 1);
-			}
-		}
-	}
-
-	// create the vertex and index buffers
-	ID3D11Buffer *vertexBuffer, *indexBuffer;
-	for (auto bufferInfo : {
-		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(VertexShaderInput) * vertexCount, vertices, &vertexBuffer, D3D11_BIND_VERTEX_BUFFER),
-		tuple<unsigned, void*, ID3D11Buffer**, unsigned>(sizeof(unsigned long) * indexCount, indices, &indexBuffer, D3D11_BIND_INDEX_BUFFER)
-	}) {
-		D3D11_BUFFER_DESC bufferDesc;
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		bufferDesc.ByteWidth = get<0>(bufferInfo);
-		bufferDesc.BindFlags = get<3>(bufferInfo);
-		bufferDesc.CPUAccessFlags = 0;
-		bufferDesc.MiscFlags = 0;
-		bufferDesc.StructureByteStride = 0;
-
-		// give the subresource structure a pointer to the raw data
-		D3D11_SUBRESOURCE_DATA bufferData;
-		bufferData.pSysMem = get<1>(bufferInfo);
-		bufferData.SysMemPitch = 0;
-		bufferData.SysMemSlicePitch = 0;
-
-		// create the buffer
-		ThrowIfFailed(device->CreateBuffer(&bufferDesc, &bufferData, get<2>(bufferInfo)));
-	}
-	delete[] vertices;
-	delete[] indices;
-
+	Mesh* cubeSphere = Mesh::LoadCubeSphere(19);
 
 	// set up the camera
 	XMFLOAT3 position(0.f, 0.f, -3.f);
@@ -552,7 +434,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMFLOAT3 up(0.f, 1.f, 0.f);
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
 	XMFLOAT3 velocity(0.f, 0.f, 0.f);
-	yaw = 0.f, pitch = 0.f;
+	float yaw = 0.f, pitch = 0.f;
 
 
 	// texture
@@ -641,9 +523,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			if (Uber::IsKeyDown(DIK_ESCAPE))
 				break;
 
-			const float sensitivity = 0.002f;
+			const float sensitivity = 0.0002f;
 			yaw = fmodf(yaw + sensitivity * Uber::I().mouseState.lX, TWOPI);
-			pitch = max(-PI * 0.5f, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), PI * 0.5f));
+			pitch = max(-HALFPI, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), HALFPI));
 
 			float speed = 2.f;
 			float x = 0.f, y = 0.f, z = 0.f;
@@ -693,9 +575,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// set the vertex buffer to active in the input assembler
 			unsigned stride = sizeof(VertexShaderInput);
 			unsigned offset = 0;
-			context->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
+			context->IASetVertexBuffers(0, 1, &(cubeSphere->vertexBuffer), &stride, &offset);
 			// set the index buffer to active in the input assembler
-			context->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+			context->IASetIndexBuffer(cubeSphere->indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 			// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -748,7 +630,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetSamplers(0, 1, &samplerState);
 
 			// render the sphere
-			context->DrawIndexed(indexCount, 0, 0);
+			context->DrawIndexed(cubeSphere->indexCount, 0, 0);
 
 			// show the fps
 			++framesDrawn;
@@ -774,13 +656,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// clean up
 	mouse->Unacquire();
 	mouse->Release();
-	mouse = nullptr;
 	keyboard->Unacquire();
 	keyboard->Release();
-	keyboard = nullptr;
 	directInput->Release();
-	directInput = nullptr;
 	worldTexture->Release();
+	cubeSphere->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
 	if (whiteBrush) whiteBrush->Release();
@@ -788,8 +668,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (d2dDevice) d2dDevice->Release();
 	if (d2dFactory) d2dFactory->Release();
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
-	if (vertexBuffer) vertexBuffer->Release();
-	if (indexBuffer) indexBuffer->Release();
 	if (samplerState) samplerState->Release();
 	if (lightingBuffer) lightingBuffer->Release();
 	if (materialBuffer) materialBuffer->Release();

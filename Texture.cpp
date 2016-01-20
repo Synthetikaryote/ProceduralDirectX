@@ -44,7 +44,7 @@ Texture* Texture::LoadCube(vector<string>& paths) {
 		else
 			hash_combine(key, keyPart);
 	}
-	return Uber::I().resourceManager->Load<Texture>(key, [paths]{
+	return Uber::I().resourceManager->Load<Texture>(key, [paths] {
 		Texture* t = new Texture();
 		t->texture = CreateTextureCube(paths);
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
