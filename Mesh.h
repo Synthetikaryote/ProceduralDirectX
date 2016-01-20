@@ -2,7 +2,6 @@
 #include "Resource.h"
 #include <directxmath.h>
 #include <d3d11_2.h>
-
 using namespace DirectX;
 
 struct VertexColorType {
@@ -15,12 +14,11 @@ struct VertexTextureType {
 	XMFLOAT2 texture;
 };
 
-struct VertexShaderInput {
+struct Vertex {
 	XMFLOAT4 position;
 	XMFLOAT4 normal;
 	XMFLOAT3 texture;
 };
-
 
 class Mesh : public Resource {
 public:
@@ -31,5 +29,6 @@ public:
 	ID3D11Buffer* vertexBuffer;
 	ID3D11Buffer* indexBuffer;
 	static Mesh* Mesh::LoadCubeSphere(unsigned gridSize = 10);
+	static Mesh* Mesh::LoadFromFile(string path);
 };
 

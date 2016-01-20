@@ -8,6 +8,7 @@ cbuffer MaterialBuffer : register(b1) {
     float4 materialAmbient;
     float4 materialDiffuse;
     float4 materialSpecular;
+	uint flags;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;

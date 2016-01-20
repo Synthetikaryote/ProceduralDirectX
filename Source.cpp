@@ -45,6 +45,8 @@ struct MaterialBufferType {
 	XMFLOAT4 materialAmbient;
 	XMFLOAT4 materialDiffuse;
 	XMFLOAT4 materialSpecular;
+	unsigned flags;
+	unsigned padding[3]; // must be a multiple of 16 bytes
 };
 struct LightingBufferType {
 	XMFLOAT4 viewPosition;
@@ -372,6 +374,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// make a cube sphere
 	Mesh* cubeSphere = Mesh::LoadCubeSphere(20);
+	//Mesh* cubeSphere = Mesh::LoadFromFile("duck.txt");
 
 	// set up the camera
 	XMFLOAT3 position(0.f, 0.f, -3.f);
@@ -391,6 +394,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		paths[i] = string(fileName);
 	}
 	auto* worldTexture = Texture::LoadCube(paths);
+	auto* duckTexture = Texture::Load(string("Models/duck.tga"));
 
 	// text
 	// create a white brush
@@ -415,14 +419,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL));
 	ThrowIfFailed(keyboard->SetDataFormat(&c_dfDIKeyboard));
 	ThrowIfFailed(keyboard->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE));
-	ThrowIfFailed(keyboard->Acquire());
+	keyboard->Acquire();
 
 	// mouse
 	IDirectInputDevice8* mouse;
 	ThrowIfFailed(directInput->CreateDevice(GUID_SysMouse, &mouse, NULL));
 	ThrowIfFailed(mouse->SetDataFormat(&c_dfDIMouse));
 	ThrowIfFailed(mouse->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
-	ThrowIfFailed(mouse->Acquire());
+	mouse->Acquire();
 
 
 	// main loop
@@ -519,7 +523,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			// stage the sphere's buffers as the ones to use
 			// set the vertex buffer to active in the input assembler
-			unsigned stride = sizeof(VertexShaderInput);
+			unsigned stride = sizeof(Vertex);
 			unsigned offset = 0;
 			context->IASetVertexBuffers(0, 1, &(cubeSphere->vertexBuffer), &stride, &offset);
 			// set the index buffer to active in the input assembler
@@ -545,6 +549,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			materialDataPtr->materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			materialDataPtr->materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			materialDataPtr->materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+			materialDataPtr->flags = 1;
 			context->Unmap(materialBuffer, 0);
 
 			// set the lightingBuffer information
@@ -565,7 +570,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
 
 			// give the pixel shader the cube texture
-			context->PSSetShaderResources(0, 1, &worldTexture->shaderResourceView);
+			context->PSSetShaderResources(1, 1, &worldTexture->shaderResourceView);
 
 			// set the vertex input layout
 			context->IASetInputLayout(litTexture.inputLayout);
@@ -606,6 +611,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	keyboard->Release();
 	directInput->Release();
 	worldTexture->Release();
+	duckTexture->Release();
 	cubeSphere->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;

@@ -1,11 +1,13 @@
 // globals
-TextureCube cubeTexture : register(t0);
+Texture2D tex : register(t0);
+TextureCube cubeTexture : register(t1);
 SamplerState SampleType;
 
 cbuffer MaterialBuffer : register(b1) {
     float4 materialAmbient;
     float4 materialDiffuse;
     float4 materialSpecular;
+	uint flags;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;
@@ -26,9 +28,17 @@ struct VertexShaderOutput {
 
 // pixel shader
 float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
-    float4 ambient = saturate(lightAmbient * materialAmbient);
+	float4 ambient = saturate(lightAmbient * materialAmbient);
 
-    float4 diffuseColor = cubeTexture.Sample(SampleType, input.tex);
+	float4 diffuseColor;
+	[branch] switch (flags) {
+		case 0:
+			diffuseColor = tex.Sample(SampleType, input.tex.xy);
+			break;
+		case 1:
+			diffuseColor = cubeTexture.Sample(SampleType, input.tex);
+			break;
+	}
     diffuseColor.w = 1.0f;
 
     float3 dirToLight = normalize(input.dirToLight);

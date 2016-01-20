@@ -96,14 +96,16 @@ ID3D11Texture2D* CreateTexture2D(string path) {
 	unsigned w, h;
 	GetTextureData(path, textureData, w, h);
 	DXGI_SAMPLE_DESC sampleDesc = {1, 0};
-	D3D11_TEXTURE2D_DESC textureDesc = {w, h, (unsigned)max(ceil(log2(w)), ceil(log2(h))), 0, DXGI_FORMAT_R8G8B8A8_UNORM, sampleDesc, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET, 0, D3D11_RESOURCE_MISC_GENERATE_MIPS};
+	unsigned mips = (unsigned)max(ceil(log2(w)), ceil(log2(h)));
+	D3D11_TEXTURE2D_DESC textureDesc = {w, h, mips, 1, DXGI_FORMAT_R8G8B8A8_UNORM, sampleDesc, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET, 0, D3D11_RESOURCE_MISC_GENERATE_MIPS};
 	auto subresources = new D3D11_SUBRESOURCE_DATA[textureDesc.MipLevels];
 	subresources[0].pSysMem = textureData;
 	subresources[0].SysMemPitch = w * 4;
 	subresources[0].SysMemSlicePitch = w * h * 4;
 	ID3D11Texture2D* tex;
 	ComPtr<ID3D11Device>& device = Uber::I().device;
-	ThrowIfFailed(device->CreateTexture2D(&textureDesc, subresources, &tex));
+	ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &tex));
+	Uber::I().context->UpdateSubresource(tex, D3D11CalcSubresource(0, 0, textureDesc.MipLevels), NULL, textureData, w * 4, w * h * 4);
 	delete[] textureData;
 	return tex;
 }

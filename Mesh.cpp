@@ -1,5 +1,8 @@
 #include "Mesh.h"
 #include "Uber.h"
+#include <Shlwapi.h>
+#include <string>
+using namespace std;
 
 Mesh* GenerateCubeSphere(unsigned gridSize);
 
@@ -22,6 +25,48 @@ Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
 	});
 }
 
+Mesh* Mesh::LoadFromFile(string path) {
+	char* filename = PathFindFileNameA(path.c_str());
+	size_t key = hash<string>()(string(filename));
+	return Uber::I().resourceManager->Load<Mesh>(key, [path] {
+		// write it to a file for the engine
+		FILE* file = nullptr;
+		errno_t error = fopen_s(&file, path.c_str(), "rb");
+		assert(error == 0);
+		// number of meshes
+		unsigned meshCount = 0;
+		fread(&meshCount, sizeof(meshCount), 1, file);
+		// can't handle more than one mesh yet
+		assert(meshCount == 1);
+
+		Mesh* mesh = new Mesh();
+		// vertex count
+		fread(&mesh->vertexCount, sizeof(mesh->vertexCount), 1, file);
+		// vertices
+		auto* vertices = new Vertex[mesh->vertexCount];
+		fread(vertices, sizeof(Vertex), mesh->vertexCount, file);
+		// index count
+		// indices
+		fread(&mesh->indexCount, sizeof(mesh->indexCount), 1, file);
+		auto* indices = new unsigned long[mesh->indexCount];
+		fread(indices, sizeof(unsigned long), mesh->indexCount, file);
+		fclose(file);
+
+		// create the vertex and index buffers
+		D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * mesh->vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
+		D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
+		ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &mesh->vertexBuffer));
+		D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * mesh->indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
+		D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
+		ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &mesh->indexBuffer));
+		delete[] vertices;
+		delete[] indices;
+
+		return mesh;
+	});
+}
+
+
 //// make a triangle
 //unsigned vertexCount = 3;
 //unsigned indexCount = 3;
@@ -41,41 +86,41 @@ Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
 //indices[2] = 2;  // bottom right
 
 // make a sphere
-Mesh* GenerateSphere(unsigned latitudes, unsigned longitudes) {
-	Mesh* mesh = new Mesh();
-	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
-	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
-	VertexShaderInput* vertices = new VertexShaderInput[mesh->vertexCount];
-	unsigned long* indices = new unsigned long[mesh->indexCount];
-	const float latStep = PI / latitudes;
-	const float lonStep = TWOPI / longitudes;
-	unsigned v = 0;
-	for (unsigned lat = 0; lat <= latitudes; ++lat) {
-		for (unsigned lon = 0; lon <= longitudes; ++lon) {
-			const float alat = lat * latStep;
-			const float alon = lon * lonStep;
-			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
-			vertices[v].normal = vertices[v].position;
-			vertices[v].normal.w = 0.0f;
-			vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
-		}
-	}
-	unsigned index = 0;
-	for (unsigned lat = 0; lat < latitudes; ++lat) {
-		for (unsigned lon = 0; lon < longitudes; ++lon) {
-			if (lat != latitudes - 1) {
-				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
-			}
-			if (lat != 0) {
-				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-			}
-		}
-	}
-}
+//Mesh* GenerateSphere(unsigned latitudes, unsigned longitudes) {
+//	Mesh* mesh = new Mesh();
+//	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
+//	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+//	auto* vertices = new Vertex[mesh->vertexCount];
+//	auto* indices = new unsigned long[mesh->indexCount];
+//	const float latStep = PI / latitudes;
+//	const float lonStep = TWOPI / longitudes;
+//	unsigned v = 0;
+//	for (unsigned lat = 0; lat <= latitudes; ++lat) {
+//		for (unsigned lon = 0; lon <= longitudes; ++lon) {
+//			const float alat = lat * latStep;
+//			const float alon = lon * lonStep;
+//			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
+//			vertices[v].normal = vertices[v].position;
+//			vertices[v].normal.w = 0.0f;
+//			vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
+//		}
+//	}
+//	unsigned index = 0;
+//	for (unsigned lat = 0; lat < latitudes; ++lat) {
+//		for (unsigned lon = 0; lon < longitudes; ++lon) {
+//			if (lat != latitudes - 1) {
+//				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+//				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+//				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+//			}
+//			if (lat != 0) {
+//				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+//				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+//				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+//			}
+//		}
+//	}
+//}
 
 
 // private functions
@@ -89,7 +134,7 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 	mesh->vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
 	// for each face, there are 3 indices per triangle, 2 triangles per quad, and gridSize^2 quads
 	mesh->indexCount = 6 * 3 * 2 * gridSize * gridSize;
-	VertexShaderInput* vertices = new VertexShaderInput[mesh->vertexCount];
+	auto* vertices = new Vertex[mesh->vertexCount];
 	struct loc {
 		unsigned x, y, z, s;
 		bool operator<(const loc &o) const {
@@ -97,7 +142,7 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 		}
 	};
 	map<loc, unsigned> indexRef;
-	unsigned long* indices = new unsigned long[mesh->indexCount];
+	auto* indices = new unsigned long[mesh->indexCount];
 	unsigned v = 0;
 	float yaw = 0.f;
 	float pitch = 0.f;
@@ -159,7 +204,7 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 	}
 
 	// create the vertex and index buffers
-	D3D11_BUFFER_DESC vertexDesc = {sizeof(VertexShaderInput) * mesh->vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
+	D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * mesh->vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
 	D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &mesh->vertexBuffer));
 	D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * mesh->indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
