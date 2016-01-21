@@ -8,6 +8,8 @@
     <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ConstantBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="color.vs" />
@@ -26,5 +28,7 @@
     <ClInclude Include="ResourceManager.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="ConstantBuffer.h" />
   </ItemGroup>
 </Project>

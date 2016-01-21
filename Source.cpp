@@ -19,6 +19,7 @@
 #include <string>
 
 #include "Uber.h"
+#include "ConstantBuffer.h"
 #include "Shader.h"
 #include "Texture.h"
 #include "Mesh.h"
@@ -35,26 +36,6 @@
 using namespace DirectX;
 using namespace std;
 using namespace Microsoft::WRL;
-
-struct MatrixBufferType {
-	XMMATRIX world;
-	XMMATRIX view;
-	XMMATRIX projection;
-};
-struct MaterialBufferType {
-	XMFLOAT4 materialAmbient;
-	XMFLOAT4 materialDiffuse;
-	XMFLOAT4 materialSpecular;
-	unsigned flags;
-	unsigned padding[3]; // must be a multiple of 16 bytes
-};
-struct LightingBufferType {
-	XMFLOAT4 viewPosition;
-	XMFLOAT4 lightDirection;
-	XMFLOAT4 lightAmbient;
-	XMFLOAT4 lightDiffuse;
-	XMFLOAT4 lightSpecular;
-};
 
 POINT savedMousePos;
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -325,49 +306,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().resourceManager = new ResourceManager();
 
 	// shaders
+	D3D11_SAMPLER_DESC samplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
 	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	},
-			{D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX}
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	}, samplerDesc
 	);
 
 	// dynamic matrix constant buffer that's in the vertex shaders
-	ID3D11Buffer* matrixBuffer = 0;
-	D3D11_BUFFER_DESC matrixBufferDesc;
-	matrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	matrixBufferDesc.ByteWidth = sizeof(MatrixBufferType);
-	matrixBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	matrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	matrixBufferDesc.MiscFlags = 0;
-	matrixBufferDesc.StructureByteStride = 0;
-	ThrowIfFailed(device->CreateBuffer(&matrixBufferDesc, NULL, &matrixBuffer));
-
-	// dynamic material constant buffer
-	ID3D11Buffer* materialBuffer = 0;
-	D3D11_BUFFER_DESC materialBufferDesc;
-	materialBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	materialBufferDesc.ByteWidth = sizeof(MaterialBufferType);
-	materialBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	materialBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	materialBufferDesc.MiscFlags = 0;
-	materialBufferDesc.StructureByteStride = 0;
-	ThrowIfFailed(device->CreateBuffer(&materialBufferDesc, NULL, &materialBuffer));
-
-	// dynamic lighting constant buffer
-	ID3D11Buffer* lightingBuffer = 0;
-	D3D11_BUFFER_DESC lightingBufferDesc;
-	lightingBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	lightingBufferDesc.ByteWidth = sizeof(LightingBufferType);
-	lightingBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	lightingBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	lightingBufferDesc.MiscFlags = 0;
-	lightingBufferDesc.StructureByteStride = 0;
-	ThrowIfFailed(device->CreateBuffer(&lightingBufferDesc, NULL, &lightingBuffer));
+	ConstantBuffer<MatrixBufferType> matrixBuffer;
+	ConstantBuffer<MaterialBufferType> materialBuffer;
+	ConstantBuffer<LightingBufferType> lightingBuffer;
 
 	// put all the buffers in an ordered array
-	ID3D11Buffer* constantBuffers[] = { matrixBuffer, materialBuffer, lightingBuffer };
+	ID3D11Buffer* constantBuffers[] = { matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer };
 
 	// make a cube sphere
 	// texture
@@ -392,7 +345,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMFLOAT3 forward(0.f, 0.f, 1.f);
 	XMFLOAT3 velocity(0.f, 0.f, 0.f);
 	float yaw = 0.f, pitch = 0.f;
-
 
 
 	// text
@@ -532,34 +484,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 				// render the model using the lit texture shader
 
-				// lock the matrixBuffer, set the new matrices inside it, and then unlock it
 				// shaders must receive transposed matrices in DirectX11
-				D3D11_MAPPED_SUBRESOURCE mappedResource;
-				ThrowIfFailed(context->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
-				auto matrixDataPtr = (MatrixBufferType*)mappedResource.pData;
-				matrixDataPtr->world = XMMatrixTranspose(worldMatrix);
-				matrixDataPtr->view = XMMatrixTranspose(viewMatrix);
-				matrixDataPtr->projection = XMMatrixTranspose(projectionMatrix);
-				context->Unmap(matrixBuffer, 0);
+				matrixBuffer.data.world = XMMatrixTranspose(worldMatrix);
+				matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
+				matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
+				matrixBuffer.UpdateSubresource();
 
-				// set the materialBuffer information
-				ThrowIfFailed(context->Map(materialBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
-				auto materialDataPtr = (MaterialBufferType*)mappedResource.pData;
-				materialDataPtr->materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				materialDataPtr->materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				materialDataPtr->materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-				materialDataPtr->flags = mesh->diffuseTexture->isTextureCube ? 1 : 0;
-				context->Unmap(materialBuffer, 0);
+				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+				materialBuffer.data.flags = mesh->diffuseTexture->isTextureCube ? 1 : 0;
+				materialBuffer.UpdateSubresource();
 
 				// set the lightingBuffer information
-				ThrowIfFailed(context->Map(lightingBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource));
-				auto lightingDataPtr = (LightingBufferType*)mappedResource.pData;
-				lightingDataPtr->lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
-				lightingDataPtr->lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				lightingDataPtr->lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
-				lightingDataPtr->lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				XMStoreFloat4(&lightingDataPtr->viewPosition, positionVector);
-				context->Unmap(lightingBuffer, 0);
+				lightingBuffer.data.lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+				lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
+				lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
+				lightingBuffer.UpdateSubresource();
 
 				// update the vertex and pixel shader constant buffers
 				// they're in the constantBuffers in the order: matrix, material, lighting
@@ -569,7 +512,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
 
 				// give the pixel shader the cube texture
-				context->PSSetShaderResources(1, 1, &mesh->diffuseTexture->shaderResourceView);
+				context->PSSetShaderResources(mesh->diffuseTexture->isTextureCube ? 1 : 0, 1, &mesh->diffuseTexture->shaderResourceView);
 
 				// set the vertex input layout
 				context->IASetInputLayout(mesh->shader->inputLayout);
@@ -577,7 +520,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				// set the vertex and pixel shaders that will be used to render this triangle
 				context->VSSetShader(mesh->shader->vertexShader, NULL, 0);
 				context->PSSetShader(mesh->shader->pixelShader, NULL, 0);
-				context->PSSetSamplers(mesh->diffuseTexture->isTextureCube ? 1 : 0, 1, &mesh->shader->samplerState);
+				context->PSSetSamplers(0, 1, &mesh->shader->samplerState);
 
 				// render the mesh
 				context->DrawIndexed(mesh->indexCount, 0, 0);
@@ -619,9 +562,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (d2dDevice) d2dDevice->Release();
 	if (d2dFactory) d2dFactory->Release();
 	if (swapChain && !windowed) swapChain->SetFullscreenState(false, NULL);
-	if (lightingBuffer) lightingBuffer->Release();
-	if (materialBuffer) materialBuffer->Release();
-	if (matrixBuffer) matrixBuffer->Release();
 	//if (textureShaderInputLayout) textureShaderInputLayout->Release();
 	//if (textureVertexShader) textureVertexShader->Release();
 	//if (texturePixelShader) texturePixelShader->Release();
