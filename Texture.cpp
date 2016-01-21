@@ -54,6 +54,7 @@ Texture* Texture::LoadCube(vector<string>& paths) {
 		srvDesc.Texture2D.MipLevels = -1;
 		ThrowIfFailed(Uber::I().device->CreateShaderResourceView(t->texture, &srvDesc, &t->shaderResourceView));
 		Uber::I().context->GenerateMips(t->shaderResourceView);
+		t->isTextureCube = true;
 		return t;
 	});
 }

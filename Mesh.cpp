@@ -9,10 +9,23 @@ Mesh* GenerateCubeSphere(unsigned gridSize);
 Mesh::Mesh() {
 }
 
-
 Mesh::~Mesh() {
+	if (vertices) delete[] vertices;
+	if (indices) delete[] indices;
 	if (vertexBuffer) vertexBuffer->Release();
 	if (indexBuffer) indexBuffer->Release();
+}
+
+void Mesh::Release() {
+	if (diffuseTexture) {
+		diffuseTexture->Release();
+		diffuseTexture = nullptr;
+	}
+	if (shader) {
+		shader->Release();
+		shader = nullptr;
+	}
+	Resource::Release();
 }
 
 Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
@@ -43,27 +56,32 @@ Mesh* Mesh::LoadFromFile(string path) {
 		// vertex count
 		fread(&mesh->vertexCount, sizeof(mesh->vertexCount), 1, file);
 		// vertices
-		auto* vertices = new Vertex[mesh->vertexCount];
-		fread(vertices, sizeof(Vertex), mesh->vertexCount, file);
+		mesh->vertices = new Vertex[mesh->vertexCount];
+		fread(mesh->vertices, sizeof(Vertex), mesh->vertexCount, file);
 		// index count
 		// indices
 		fread(&mesh->indexCount, sizeof(mesh->indexCount), 1, file);
-		auto* indices = new unsigned long[mesh->indexCount];
-		fread(indices, sizeof(unsigned long), mesh->indexCount, file);
+		mesh->indices = new unsigned long[mesh->indexCount];
+		fread(mesh->indices, sizeof(unsigned long), mesh->indexCount, file);
 		fclose(file);
 
 		// create the vertex and index buffers
-		D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * mesh->vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
-		D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
-		ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &mesh->vertexBuffer));
-		D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * mesh->indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
-		D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
-		ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &mesh->indexBuffer));
-		delete[] vertices;
-		delete[] indices;
+		mesh->CreateBuffers();
 
 		return mesh;
 	});
+}
+
+void Mesh::CreateBuffers() {
+	assert(vertices);
+	assert(indices);
+
+	D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
+	D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
+	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &vertexBuffer));
+	D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
+	D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
+	ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &indexBuffer));
 }
 
 
@@ -134,7 +152,7 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 	mesh->vertexCount = 8 + 12 * subdivisions + 6 * subdivisions * subdivisions + 12 * (subdivisions + 2);
 	// for each face, there are 3 indices per triangle, 2 triangles per quad, and gridSize^2 quads
 	mesh->indexCount = 6 * 3 * 2 * gridSize * gridSize;
-	auto* vertices = new Vertex[mesh->vertexCount];
+	mesh->vertices = new Vertex[mesh->vertexCount];
 	struct loc {
 		unsigned x, y, z, s;
 		bool operator<(const loc &o) const {
@@ -142,7 +160,6 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 		}
 	};
 	map<loc, unsigned> indexRef;
-	auto* indices = new unsigned long[mesh->indexCount];
 	unsigned v = 0;
 	float yaw = 0.f;
 	float pitch = 0.f;
@@ -164,19 +181,20 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 				indexRef[p] = v;
 				float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
 				float x2 = x * x, y2 = y * y, z2 = z * z;
-				vertices[v].position = XMFLOAT4(
+				mesh->vertices[v].position = XMFLOAT4(
 					x * sqrt(1.f - y2 / 2.f - z2 / 2.f + y2 * z2 / 3.f),
 					y * sqrt(1.f - x2 / 2.f - z2 / 2.f + x2 * z2 / 3.f),
 					z * sqrt(1.f - x2 / 2.f - y2 / 2.f + x2 * y2 / 3.f),
 					1.f);
-				vertices[v].normal = vertices[v].position;
-				vertices[v].normal.w = 0.0f;
-				vertices[v].texture = XMFLOAT3(-x, y, z);
+				mesh->vertices[v].normal = mesh->vertices[v].position;
+				mesh->vertices[v].normal.w = 0.0f;
+				mesh->vertices[v].texture = XMFLOAT3(-x, y, z);
 				++v;
 			}
 		}
 	}
 	// indices
+	mesh->indices = new unsigned long[mesh->indexCount];
 	unsigned index = 0;
 	auto getIndex = [indexRef, w](unsigned i, unsigned c, unsigned r) {
 		unsigned x = 0, y = 0, z = 0;
@@ -193,25 +211,18 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w; ++r) {
 			for (unsigned c = 0; c < w; ++c) {
-				indices[index++] = getIndex(i, c, r);
-				indices[index++] = getIndex(i, c + 1, r);
-				indices[index++] = getIndex(i, c + 1, r + 1);
-				indices[index++] = indices[index - 3];
-				indices[index++] = indices[index - 2];
-				indices[index++] = getIndex(i, c, r + 1);
+				mesh->indices[index++] = getIndex(i, c, r);
+				mesh->indices[index++] = getIndex(i, c + 1, r);
+				mesh->indices[index++] = getIndex(i, c + 1, r + 1);
+				mesh->indices[index++] = mesh->indices[index - 3];
+				mesh->indices[index++] = mesh->indices[index - 2];
+				mesh->indices[index++] = getIndex(i, c, r + 1);
 			}
 		}
 	}
 
 	// create the vertex and index buffers
-	D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * mesh->vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
-	D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
-	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &mesh->vertexBuffer));
-	D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * mesh->indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
-	D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
-	ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &mesh->indexBuffer));
-	delete[] vertices;
-	delete[] indices;
+	mesh->CreateBuffers();
 
 	return mesh;
 }

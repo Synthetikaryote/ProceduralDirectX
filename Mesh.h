@@ -2,6 +2,8 @@
 #include "Resource.h"
 #include <directxmath.h>
 #include <d3d11_2.h>
+#include "Texture.h"
+#include "Shader.h"
 using namespace DirectX;
 
 struct VertexColorType {
@@ -22,13 +24,19 @@ struct Vertex {
 
 class Mesh : public Resource {
 public:
-	Mesh();
-	~Mesh();
 	unsigned vertexCount = 0;
 	unsigned indexCount = 0;
-	ID3D11Buffer* vertexBuffer;
-	ID3D11Buffer* indexBuffer;
+	Vertex* vertices = nullptr;
+	unsigned long* indices = nullptr;
+	ID3D11Buffer* vertexBuffer = nullptr;
+	ID3D11Buffer* indexBuffer = nullptr;
+	Texture* diffuseTexture = nullptr;
+	Shader* shader = nullptr;
+
+	Mesh();
+	~Mesh();
+	void Release() override;
 	static Mesh* Mesh::LoadCubeSphere(unsigned gridSize = 10);
 	static Mesh* Mesh::LoadFromFile(string path);
+	void CreateBuffers();
 };
-

@@ -1,22 +1,35 @@
 #include "Shader.h"
 #include "Uber.h"
 #include <wrl.h>
+#include <Shlwapi.h>
 using namespace Microsoft::WRL;
 
-Shader::Shader(string vertexCompiledPath, string pixelCompiledPath, vector<D3D11_INPUT_ELEMENT_DESC> vertexInputDesc)
-{
-	auto vsBytecode = Read(vertexCompiledPath);
-	ComPtr<ID3D11Device>& device = Uber::I().device;
-	ThrowIfFailed(Uber::I().device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &vertexShader));
-
-	auto psBytecode = Read(pixelCompiledPath);
-	ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &pixelShader));
-
-	// this needs to match the vertex shader's input data structure
-	ThrowIfFailed(device->CreateInputLayout(&vertexInputDesc[0], vertexInputDesc.size(), &vsBytecode[0], vsBytecode.size(), &inputLayout));
+Shader::Shader() {
 }
 
 
-Shader::~Shader()
-{
+Shader::~Shader() {
+	if (samplerState) samplerState->Release();
+}
+
+Shader* Shader::LoadShader(string vertexCompiledPath, string pixelCompiledPath, vector<D3D11_INPUT_ELEMENT_DESC> vertexInputDesc, D3D11_SAMPLER_DESC samplerDesc) {
+	char keyString[512];
+	sprintf_s(keyString, "Shader%s%s", vertexCompiledPath, pixelCompiledPath);
+	size_t key = hash<string>()(string(keyString));
+	return Uber::I().resourceManager->Load<Shader>(key, [&vertexCompiledPath, &pixelCompiledPath, &vertexInputDesc, &samplerDesc] {
+		Shader* s = new Shader();
+		auto vsBytecode = Read(vertexCompiledPath);
+		ComPtr<ID3D11Device>& device = Uber::I().device;
+		ThrowIfFailed(Uber::I().device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &s->vertexShader));
+
+		auto psBytecode = Read(pixelCompiledPath);
+		ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &s->pixelShader));
+
+		// this needs to match the vertex shader's input data structure
+		ThrowIfFailed(device->CreateInputLayout(&vertexInputDesc[0], vertexInputDesc.size(), &vsBytecode[0], vsBytecode.size(), &s->inputLayout));
+
+		ThrowIfFailed(device->CreateSamplerState(&samplerDesc, &s->samplerState));
+
+		return s;
+	});
 }

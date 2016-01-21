@@ -20,6 +20,8 @@ public:
 
 	ID3D11Texture2D* texture;
 	ID3D11ShaderResourceView* shaderResourceView;
+	bool isTextureCube = false;
+
 	static Texture* Load(string& path);
 	static Texture* LoadCube(vector<string>& paths);
 };

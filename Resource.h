@@ -7,7 +7,7 @@ public:
 	Resource();
 	~Resource();
 	void AddRef();
-	void Release();
+	virtual void Release();
 	unsigned refCount;
 };
 
