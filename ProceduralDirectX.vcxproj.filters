@@ -12,14 +12,12 @@
     <ClCompile Include="ConstantBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="color.vs" />
-    <None Include="color.ps" />
-    <None Include="texture.vs" />
-    <None Include="texture.ps" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="LitTexturePS.hlsl" />
-    <FxCompile Include="LitTextureVS.hlsl" />
+    <FxCompile Include="LitTexturePS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="LitTextureVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shader.h" />
@@ -30,5 +28,10 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ConstantBuffer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{6d857710-7e88-45d9-9ac4-73148ea6f575}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

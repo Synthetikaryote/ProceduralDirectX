@@ -82,8 +82,6 @@
     <ClCompile Include="Uber.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="color.ps" />
-    <None Include="color.vs" />
     <FxCompile Include="LitTexturePS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
@@ -101,8 +99,6 @@
       </DisableOptimizations>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</EnableDebuggingInformation>
     </FxCompile>
-    <None Include="texture.vs" />
-    <None Include="texture.ps" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConstantBuffer.h" />
