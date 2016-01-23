@@ -346,6 +346,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// set up the camera
 	Uber::I().camera = new Camera();
+	Uber::I().camera->binds = {DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL};
 	Uber::I().camera->sensitivity = 0.0002f;
 
 	// text

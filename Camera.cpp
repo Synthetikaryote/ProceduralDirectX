@@ -31,9 +31,9 @@ void Camera::Update(float elapsed) {
 		pitch = max(-HALFPI, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), HALFPI));
 
 		float speed = 2.f;
-		float x = (IsKeyDown(DIK_S) ? -1.f : 0.f) + (IsKeyDown(DIK_F) ? 1.f : 0.f);
-		float y = (IsKeyDown(DIK_LCONTROL) ? -1.f : 0.f) + (IsKeyDown(DIK_SPACE) ? 1.f : 0.f);
-		float z = (IsKeyDown(DIK_D) ? -1.f : 0.f) + (IsKeyDown(DIK_E) ? 1.f : 0.f);
+		float x = (IsKeyDown(binds.left) ? -1.f : 0.f) + (IsKeyDown(binds.right) ? 1.f : 0.f);
+		float y = (IsKeyDown(binds.down) ? -1.f : 0.f) + (IsKeyDown(binds.up) ? 1.f : 0.f);
+		float z = (IsKeyDown(binds.back) ? -1.f : 0.f) + (IsKeyDown(binds.forward) ? 1.f : 0.f);
 		float lenSq = x * x + y * y + z * z;
 		if (lenSq > 0.f) {
 			float lenInv = 1.f / sqrt(lenSq);
