@@ -4,6 +4,7 @@
 #include <string>
 #include "Uber.h"
 #include <functional>
+#include "ResourceManager.h"
 using namespace std;
 
 void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsigned& h);

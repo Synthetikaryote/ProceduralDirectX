@@ -2,6 +2,10 @@
 #include "Uber.h"
 #include <Shlwapi.h>
 #include <string>
+#include "Texture.h"
+#include "Shader.h"
+#include <map>
+#include "ResourceManager.h"
 using namespace std;
 
 Mesh* GenerateCubeSphere(unsigned gridSize);

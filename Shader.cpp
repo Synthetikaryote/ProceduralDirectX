@@ -2,6 +2,8 @@
 #include "Uber.h"
 #include <wrl.h>
 #include <Shlwapi.h>
+#include "Texture.h"
+#include "ResourceManager.h"
 using namespace Microsoft::WRL;
 
 Shader::Shader() {

@@ -32,13 +32,14 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
 
 	float4 diffuseColor;
 	[branch] switch (slotsUsed) {
-		case 0:
-			break;
 		case 1:
 			diffuseColor = tex.Sample(SampleType, input.tex.xy);
 			break;
 		case 2:
 			diffuseColor = cubeTexture.Sample(SampleType, input.tex);
+			break;
+		default:
+			diffuseColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
 			break;
 	}
     diffuseColor.w = 1.0f;

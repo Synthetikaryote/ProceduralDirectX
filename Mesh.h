@@ -2,8 +2,9 @@
 #include "Resource.h"
 #include <directxmath.h>
 #include <d3d11_2.h>
-#include "Texture.h"
-#include "Shader.h"
+#include <vector>
+class Texture;
+class Shader;
 using namespace DirectX;
 
 struct VertexColorType {

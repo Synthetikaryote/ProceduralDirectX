@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "Mesh.h"
+class Mesh;
 using namespace std;
 
 class Model {

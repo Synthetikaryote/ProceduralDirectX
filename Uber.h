@@ -5,9 +5,9 @@
 #include <chrono>
 #include <vector>
 #include <wrl.h>
-#include "ResourceManager.h"
 #include <dinput.h>
-
+class ResourceManager;
+class Camera;
 using namespace std;
 using namespace Microsoft::WRL;
 
@@ -33,6 +33,8 @@ inline void hash_combine(size_t& seed, const T& v) {
 	seed ^= hash<T>()(v)+0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
+bool IsKeyDown(unsigned char);
+
 // singleton pattern from http://stackoverflow.com/questions/1008019/c-singleton-design-pattern
 class Uber {
 public:
@@ -48,12 +50,13 @@ public:
 	Uber(Uber const&) = delete;
 	void operator=(Uber const&) = delete;
 
+	HWND hWnd;
+	WNDCLASSEX wc;
 	ComPtr<ID3D11Device> device;
 	ID3D11DeviceContext* context;
 	ResourceManager* resourceManager;
 	unsigned char keyboardState[256];
 	DIMOUSESTATE mouseState;
 	int mouseX = 0, mouseY = 0;
-
-	static bool IsKeyDown(unsigned char);
+	Camera* camera;
 };

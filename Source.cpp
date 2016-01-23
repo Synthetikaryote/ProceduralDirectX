@@ -23,6 +23,8 @@
 #include "Shader.h"
 #include "Texture.h"
 #include "Mesh.h"
+#include "ResourceManager.h"
+#include "Camera.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -42,26 +44,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	// the handle for the window, filled by a function
-	HWND hWnd;
-	// this struct holds information for the window class
-	WNDCLASSEX wc;
+	
+
 
 	// clear out the window class for use
-	ZeroMemory(&wc, sizeof(WNDCLASSEX));
+	ZeroMemory(&Uber::I().wc, sizeof(WNDCLASSEX));
 
 	// fill in the struct with the needed information
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.style = CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = WindowProc;
-	wc.hInstance = hInstance;
-	wc.hCursor = NULL; // LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
-	wc.lpszClassName = L"WindowClass1";
+	Uber::I().wc.cbSize = sizeof(WNDCLASSEX);
+	Uber::I().wc.style = CS_HREDRAW | CS_VREDRAW;
+	Uber::I().wc.lpfnWndProc = WindowProc;
+	Uber::I().wc.hInstance = hInstance;
+	Uber::I().wc.hCursor = NULL; // LoadCursor(NULL, IDC_ARROW);
+	Uber::I().wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
+	Uber::I().wc.lpszClassName = L"WindowClass1";
 	ShowCursor(false);
 
 	// register the window class
-	RegisterClassEx(&wc);
+	RegisterClassEx(&Uber::I().wc);
 
 	bool vsync = false;
 	bool windowed = true;
@@ -72,7 +72,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
 	// create the window and use the result as the handle
-	hWnd = CreateWindowEx(NULL,
+	Uber::I().hWnd = CreateWindowEx(NULL,
 		L"WindowClass1",    // name of the window class
 		L"ProceduralDirectX",   // title of the window
 		WS_OVERLAPPEDWINDOW,    // window style
@@ -86,7 +86,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		NULL);    // used with multiple windows, NULL
 
 	// display the window on the screen
-	ShowWindow(hWnd, nCmdShow);
+	ShowWindow(Uber::I().hWnd, nCmdShow);
 
 	IDXGIFactory* factory;
 	CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
@@ -142,7 +142,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	swapChainDesc.BufferDesc.Height = screenHeight;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.OutputWindow = hWnd;
+	swapChainDesc.OutputWindow = Uber::I().hWnd;
 	// turn multisampling off
 	swapChainDesc.SampleDesc.Count = 1;
 	unsigned qualityLevels;
@@ -345,13 +345,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	vector<Mesh*> meshes = {world};
 
 	// set up the camera
-	XMFLOAT3 position(0.f, 0.f, -3.f);
-	XMFLOAT3 rotation(0.f, 0.f, 0.f);
-	XMFLOAT3 up(0.f, 1.f, 0.f);
-	XMFLOAT3 forward(0.f, 0.f, 1.f);
-	XMFLOAT3 velocity(0.f, 0.f, 0.f);
-	float yaw = 0.f, pitch = 0.f;
-
+	Uber::I().camera = new Camera();
+	Uber::I().camera->sensitivity = 0.0002f;
 
 	// text
 	// create a white brush
@@ -375,14 +370,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	IDirectInputDevice8* keyboard;
 	ThrowIfFailed(directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL));
 	ThrowIfFailed(keyboard->SetDataFormat(&c_dfDIKeyboard));
-	ThrowIfFailed(keyboard->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE));
+	ThrowIfFailed(keyboard->SetCooperativeLevel(Uber::I().hWnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE));
 	keyboard->Acquire();
-
 	// mouse
 	IDirectInputDevice8* mouse;
 	ThrowIfFailed(directInput->CreateDevice(GUID_SysMouse, &mouse, NULL));
 	ThrowIfFailed(mouse->SetDataFormat(&c_dfDIMouse));
-	ThrowIfFailed(mouse->SetCooperativeLevel(hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
+	ThrowIfFailed(mouse->SetCooperativeLevel(Uber::I().hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
 	mouse->Acquire();
 
 
@@ -411,6 +405,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			float elapsed = time() - lastFrameTime;
 			lastFrameTime = time();
 
+			// escape to quit
+			if (IsKeyDown(DIK_ESCAPE))
+				break;
+
+			if (IsKeyDown(DIK_1))
+				Uber::I().camera->focus = world;
+			if (IsKeyDown(DIK_2))
+				Uber::I().camera->focus = nullptr;
+
 			// read the input
 			HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
 			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
@@ -420,51 +423,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				mouse->Acquire();
 			Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
 			Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
-			if (GetActiveWindow() == hWnd) {
-				RECT r;
-				GetWindowRect(hWnd, &r);
-				SetCursorPos((float)(r.right - r.left) * 0.5f, (float)(r.bottom - r.top) * 0.5f);
-			}
 
-			// escape to quit
-			if (Uber::IsKeyDown(DIK_ESCAPE))
-				break;
-
-			const float sensitivity = 0.0002f;
-			yaw = fmodf(yaw + sensitivity * Uber::I().mouseState.lX, TWOPI);
-			pitch = max(-HALFPI, min(fmodf(pitch + sensitivity * Uber::I().mouseState.lY, TWOPI), HALFPI));
-
-			float speed = 2.f;
-			float x = 0.f, y = 0.f, z = 0.f;
-			x = (Uber::IsKeyDown(DIK_S) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_F) ? 1.f : 0.f);
-			y = (Uber::IsKeyDown(DIK_LCONTROL) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_SPACE) ? 1.f : 0.f);
-			z = (Uber::IsKeyDown(DIK_D) ? -1.f : 0.f) + (Uber::IsKeyDown(DIK_E) ? 1.f : 0.f);
-			float lenSq = x * x + y * y + z * z;
-			if (lenSq > 0.f) {
-				float lenInv = 1.f / sqrt(lenSq);
-				x *= lenInv; y *= lenInv; z *= lenInv;
-				float py = y * cos(pitch) - z * sin(pitch), pz = y * sin(pitch) + z * cos(pitch);
-				float yx = x * cos(yaw) + pz * sin(yaw), yz = -x * sin(yaw) + pz * cos(yaw);
-				x = yx; y = py; z = yz;
-				float mult = speed * elapsed;
-				x *= mult; y *= mult; z *= mult;
-				position.x += x; position.y += y; position.z += z;
-			}
-
+			// update the camera
+			Uber::I().camera->Update(elapsed);
 
 			// bind the render target view and depth stencil buffer to the output render pipeline
 			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
 
-			// clear the back buffer with the background color and clear the depth buffer
-			float color[4] = { 0.f, 0.f, 0.f, 1.f };
-			context->ClearRenderTargetView(renderTargetView, color);
-			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-
 			// generate the view matrix based on the camera
-			XMVECTOR upVector = XMLoadFloat3(&up);
-			XMVECTOR lookAtVector = XMLoadFloat3(&forward);
-			XMVECTOR positionVector = XMLoadFloat3(&position);
-			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(pitch, yaw, 0.f);
+			XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+			XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
+			XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
+			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->pitch, Uber::I().camera->yaw, 0.f);
 			// rotate the forward and up according to the camera rotation
 			lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
 			upVector = XMVector3TransformCoord(upVector, rotationMatrix);
@@ -487,6 +457,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
 			lightingBuffer.UpdateSubresource();
+
+			// clear the back buffer with the background color and clear the depth buffer
+			float color[4] = {0.f, 0.f, 0.f, 1.f};
+			context->ClearRenderTargetView(renderTargetView, color);
+			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 			for (auto* mesh : meshes) {
 				// add rotation to the sphere
@@ -550,6 +525,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		mesh->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
+	delete Uber::I().camera;
 	if (whiteBrush) whiteBrush->Release();
 	if (d2dContext) d2dContext->Release();
 	if (d2dDevice) d2dDevice->Release();
