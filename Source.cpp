@@ -66,8 +66,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 2000 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 1600 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 1000 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -305,6 +305,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
 
+	// constant buffers that are in the shaders
+	// these lines create them in their constructor according to the type information
+	ConstantBuffer<MatrixBufferType> matrixBuffer;
+	ConstantBuffer<MaterialBufferType> materialBuffer;
+	ConstantBuffer<LightingBufferType> lightingBuffer;
+
 	// shaders
 	D3D11_SAMPLER_DESC samplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
 	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", {
@@ -313,14 +319,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	}, samplerDesc
 	);
-
-	// dynamic matrix constant buffer that's in the vertex shaders
-	ConstantBuffer<MatrixBufferType> matrixBuffer;
-	ConstantBuffer<MaterialBufferType> materialBuffer;
-	ConstantBuffer<LightingBufferType> lightingBuffer;
-
-	// put all the buffers in an ordered array
-	ID3D11Buffer* constantBuffers[] = { matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer };
+	// set up the vertex and pixel shader constant buffers
+	// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
+	litTexture->vertexShaderConstantBuffers = {matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer};
+	// the pixel shader just needs material and lighting in its 0, 1 spots
+	litTexture->pixelShaderConstantBuffers = {materialBuffer.buffer, lightingBuffer.buffer};
 
 	// make a cube sphere
 	// texture
@@ -332,8 +335,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		paths[i] = string(fileName);
 	}
 	Mesh* world = Mesh::LoadCubeSphere(20);
-	world->diffuseTexture = Texture::LoadCube(paths);
+	Texture* diffuseTexture = Texture::LoadCube(paths);
+	TextureBinding diffuseBinding = {diffuseTexture, diffuseTexture->isTextureCube ? 1 : 0};
+	world->textureBindings = {diffuseBinding};
 	world->shader = litTexture;
+	
 	//auto* duckTexture = Texture::Load(string("Models/duck.tga"));
 	//Mesh* duck = Mesh::LoadFromFile("duck.txt");
 	vector<Mesh*> meshes = {world};
@@ -467,13 +473,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// create the view matrix
 			XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
 
+			// update the constant buffers that are constant for all meshes
+			// shaders must receive transposed matrices in DirectX11
+			matrixBuffer.data.world = XMMatrixTranspose(worldMatrix);
+			matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
+			matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
+			matrixBuffer.UpdateSubresource();
+
+			// set the lightingBuffer information
+			lightingBuffer.data.lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+			lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
+			lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
+			lightingBuffer.UpdateSubresource();
+
 			for (auto* mesh : meshes) {
 				// add rotation to the sphere
 				//worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
 
-
 				// stage the mesh's buffers as the ones to use
 				// set the vertex buffer to active in the input assembler
+				
 				unsigned stride = sizeof(Vertex);
 				unsigned offset = 0;
 				context->IASetVertexBuffers(0, 1, &(mesh->vertexBuffer), &stride, &offset);
@@ -484,46 +505,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 				// render the model using the lit texture shader
 
-				// shaders must receive transposed matrices in DirectX11
-				matrixBuffer.data.world = XMMatrixTranspose(worldMatrix);
-				matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
-				matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
-				matrixBuffer.UpdateSubresource();
+				mesh->shader->SwitchTo();
 
+				// set the material settings
 				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-				materialBuffer.data.flags = mesh->diffuseTexture->isTextureCube ? 1 : 0;
+				materialBuffer.data.slotsUsed = 0;
+				for (auto& binding : mesh->textureBindings)
+					materialBuffer.data.slotsUsed |= 1 << binding.shaderSlot;
 				materialBuffer.UpdateSubresource();
 
-				// set the lightingBuffer information
-				lightingBuffer.data.lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
-				lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
-				lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
-				lightingBuffer.UpdateSubresource();
-
-				// update the vertex and pixel shader constant buffers
-				// they're in the constantBuffers in the order: matrix, material, lighting
-				// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
-				context->VSSetConstantBuffers(0, 3, constantBuffers);
-				// the pixel shader just needs material, lighting in its 1, 2 spots
-				context->PSSetConstantBuffers(1, 2, &(constantBuffers[1]));
-
-				// give the pixel shader the cube texture
-				context->PSSetShaderResources(mesh->diffuseTexture->isTextureCube ? 1 : 0, 1, &mesh->diffuseTexture->shaderResourceView);
-
-				// set the vertex input layout
-				context->IASetInputLayout(mesh->shader->inputLayout);
-
-				// set the vertex and pixel shaders that will be used to render this triangle
-				context->VSSetShader(mesh->shader->vertexShader, NULL, 0);
-				context->PSSetShader(mesh->shader->pixelShader, NULL, 0);
-				context->PSSetSamplers(0, 1, &mesh->shader->samplerState);
-
-				// render the mesh
-				context->DrawIndexed(mesh->indexCount, 0, 0);
+				mesh->Draw();
 			}
 
 			// show the fps

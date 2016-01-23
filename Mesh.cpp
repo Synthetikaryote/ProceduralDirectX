@@ -17,15 +17,23 @@ Mesh::~Mesh() {
 }
 
 void Mesh::Release() {
-	if (diffuseTexture) {
-		diffuseTexture->Release();
-		diffuseTexture = nullptr;
-	}
+	for (auto& binding : textureBindings)
+		binding.texture->Release();
+	textureBindings.clear();
 	if (shader) {
 		shader->Release();
 		shader = nullptr;
 	}
 	Resource::Release();
+}
+
+void Mesh::Draw() {
+	// give the pixel shader the textures
+	for (auto& binding : textureBindings)
+		Uber::I().context->PSSetShaderResources(binding.shaderSlot, 1, &binding.texture->shaderResourceView);
+
+	// render the mesh
+	Uber::I().context->DrawIndexed(indexCount, 0, 0);
 }
 
 Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {

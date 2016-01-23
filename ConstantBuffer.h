@@ -13,7 +13,7 @@ struct MaterialBufferType {
 	XMFLOAT4 materialAmbient;
 	XMFLOAT4 materialDiffuse;
 	XMFLOAT4 materialSpecular;
-	unsigned flags;
+	unsigned slotsUsed;
 	unsigned padding[3]; // must be a multiple of 16 bytes
 };
 struct LightingBufferType {

@@ -22,6 +22,11 @@ struct Vertex {
 	XMFLOAT3 texture;
 };
 
+struct TextureBinding {
+	Texture* texture;
+	unsigned shaderSlot;
+};
+
 class Mesh : public Resource {
 public:
 	unsigned vertexCount = 0;
@@ -30,13 +35,15 @@ public:
 	unsigned long* indices = nullptr;
 	ID3D11Buffer* vertexBuffer = nullptr;
 	ID3D11Buffer* indexBuffer = nullptr;
-	Texture* diffuseTexture = nullptr;
+	vector<TextureBinding> textureBindings;
 	Shader* shader = nullptr;
 
 	Mesh();
 	~Mesh();
 	void Release() override;
-	static Mesh* Mesh::LoadCubeSphere(unsigned gridSize = 10);
-	static Mesh* Mesh::LoadFromFile(string path);
+	void Draw();
+
+	static Mesh* LoadCubeSphere(unsigned gridSize = 10);
+	static Mesh* LoadFromFile(string path);
 	void CreateBuffers();
 };
