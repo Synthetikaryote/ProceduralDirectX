@@ -8,7 +8,9 @@
 #include "ResourceManager.h"
 using namespace std;
 
+Mesh* GeneratePlane(unsigned columns, unsigned rows);
 Mesh* GenerateCubeSphere(unsigned gridSize);
+Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes);
 
 Mesh::Mesh() {
 }
@@ -38,6 +40,30 @@ void Mesh::Draw() {
 
 	// render the mesh
 	Uber::I().context->DrawIndexed(indexCount, 0, 0);
+}
+
+Mesh* Mesh::LoadQuad() {
+	return Mesh::LoadPlane(1, 1);
+}
+
+Mesh* Mesh::LoadPlane(unsigned columns, unsigned rows) {
+	char keyString[40];
+	sprintf_s(keyString, "MeshPlane%u,%u", columns, rows);
+	size_t key = hash<string>()(string(keyString));
+
+	return Uber::I().resourceManager->Load<Mesh>(key, [columns, rows] {
+		return GeneratePlane(columns, rows);
+	});
+}
+
+Mesh* Mesh::LoadSphere(unsigned longitudes, unsigned latitudes) {
+	char keyString[40];
+	sprintf_s(keyString, "MeshSphere%u,%u", longitudes, latitudes);
+	size_t key = hash<string>()(string(keyString));
+
+	return Uber::I().resourceManager->Load<Mesh>(key, [longitudes, latitudes] {
+		return GenerateSphere(longitudes, latitudes);
+	});
 }
 
 Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
@@ -115,45 +141,84 @@ void Mesh::CreateBuffers() {
 //indices[1] = 1;  // top middle
 //indices[2] = 2;  // bottom right
 
-// make a sphere
-//Mesh* GenerateSphere(unsigned latitudes, unsigned longitudes) {
-//	Mesh* mesh = new Mesh();
-//	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
-//	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
-//	auto* vertices = new Vertex[mesh->vertexCount];
-//	auto* indices = new unsigned long[mesh->indexCount];
-//	const float latStep = PI / latitudes;
-//	const float lonStep = TWOPI / longitudes;
-//	unsigned v = 0;
-//	for (unsigned lat = 0; lat <= latitudes; ++lat) {
-//		for (unsigned lon = 0; lon <= longitudes; ++lon) {
-//			const float alat = lat * latStep;
-//			const float alon = lon * lonStep;
-//			vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
-//			vertices[v].normal = vertices[v].position;
-//			vertices[v].normal.w = 0.0f;
-//			vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
-//		}
-//	}
-//	unsigned index = 0;
-//	for (unsigned lat = 0; lat < latitudes; ++lat) {
-//		for (unsigned lon = 0; lon < longitudes; ++lon) {
-//			if (lat != latitudes - 1) {
-//				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-//				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-//				indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
-//			}
-//			if (lat != 0) {
-//				indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
-//				indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-//				indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
-//			}
-//		}
-//	}
-//}
-
-
 // private functions
+
+Mesh* GeneratePlane(unsigned columns, unsigned rows) {
+	Mesh* mesh = new Mesh();
+	mesh->vertexCount = (columns + 1) * (rows + 1);
+	mesh->indexCount = columns * rows * 3 * 2;
+	mesh->vertices = new Vertex[mesh->vertexCount];
+	mesh->indices = new unsigned long[mesh->indexCount];
+	float xStep = 1.0f / static_cast<float>(columns);
+	float yStep = 1.0f / static_cast<float>(rows);
+	unsigned long v = 0;
+	unsigned long i = 0;
+	for (unsigned r = 0; r <= rows; ++r) {
+		for (unsigned c = 0; c <= columns; ++c) {
+			mesh->vertices[v].position = XMFLOAT4(c * xStep, r * yStep, 0.0f, 1.0f);
+			mesh->vertices[v].normal = XMFLOAT4(0.0f, 0.0f, 1.0f, 0.0f);
+			mesh->vertices[v].tangent = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
+			mesh->vertices[v].texture = XMFLOAT3(c * xStep, r * yStep, 0.0f);
+			if (c < columns && r < rows) {
+				mesh->indices[i++] = v;
+				mesh->indices[i++] = v + 1;
+				mesh->indices[i++] = v + (columns + 1) + 1;
+				mesh->indices[i++] = v;
+				mesh->indices[i++] = v + (columns + 1) + 1;
+				mesh->indices[i++] = v + (columns + 1);
+			}
+			++v;
+		}
+	}
+
+	// create the vertex and index buffers
+	mesh->CreateBuffers();
+
+	return mesh;
+}
+
+// make a sphere
+Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes) {
+	Mesh* mesh = new Mesh();
+	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
+	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	mesh->vertices = new Vertex[mesh->vertexCount];
+	mesh->indices = new unsigned long[mesh->indexCount];
+	const float latStep = PI / latitudes;
+	const float lonStep = TWOPI / longitudes;
+	unsigned long v = 0;
+	for (unsigned lat = 0; lat <= latitudes; ++lat) {
+		for (unsigned lon = 0; lon <= longitudes; ++lon) {
+			const float alat = lat * latStep;
+			const float alon = lon * lonStep;
+			mesh->vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
+			mesh->vertices[v].normal = mesh->vertices[v].position;
+			mesh->vertices[v].normal.w = 0.0f;
+			mesh->vertices[v].tangent = XMFLOAT4(sin(alat) * cos(alon + lonStep) - sin(alat) * cos(alon), 0.0f, sin(alat) * sin(alon + lonStep) - sin(alat) * sin(alon), 0.0f);
+			mesh->vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
+		}
+	}
+	unsigned index = 0;
+	for (unsigned lat = 0; lat < latitudes; ++lat) {
+		for (unsigned lon = 0; lon < longitudes; ++lon) {
+			if (lat != latitudes - 1) {
+				mesh->indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
+			}
+			if (lat != 0) {
+				mesh->indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
+				mesh->indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
+			}
+		}
+	}
+
+	// create the vertex and index buffers
+	mesh->CreateBuffers();
+
+	return mesh;
+}
 
 // (quadrilateralized spherical cube)
 Mesh* GenerateCubeSphere(unsigned gridSize) {

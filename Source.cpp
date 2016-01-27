@@ -66,8 +66,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 1000 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 2000 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 1600 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -316,6 +316,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", {
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	}, samplerDesc
 	);
@@ -328,16 +329,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// make a cube sphere
 	// texture
 	// note: go to planetpixelemporium for textures
-	vector<string> paths(6);
-	for (int i = 0; i < 6; ++i) {
-		char fileName[40];
-		sprintf_s(fileName, "earth_%c.tga", "rludfb"[i]);
-		paths[i] = string(fileName);
-	}
-	Mesh* world = Mesh::LoadCubeSphere(20);
-	Texture* diffuseTexture = Texture::LoadCube(paths);
+	//vector<string> paths(6);
+	//for (int i = 0; i < 6; ++i) {
+	//	char fileName[40];
+	//	sprintf_s(fileName, "earth_%c.tga", "rludfb"[i]);
+	//	paths[i] = string(fileName);
+	//}
+	//Mesh* world = Mesh::LoadCubeSphere(20);
+	Mesh* world = Mesh::LoadSphere();
+	//Texture* diffuseTexture = Texture::LoadCube(paths);
+	Texture* diffuseTexture = Texture::Load(string("earth.tga"));
+	Texture* specularTexture = Texture::Load(string("earth_spec.tga"));
+	Texture* normalTexture = Texture::Load(string("earth_normal.tga"));
 	TextureBinding diffuseBinding = {diffuseTexture, diffuseTexture->isTextureCube ? 1 : 0};
-	world->textureBindings = {diffuseBinding};
+	TextureBinding specularBinding = {specularTexture, 2};
+	TextureBinding normalBinding = {normalTexture, 3};
+	world->textureBindings = {diffuseBinding, specularBinding, normalBinding};
 	world->shader = litTexture;
 	
 	//auto* duckTexture = Texture::Load(string("Models/duck.tga"));
@@ -466,7 +473,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			for (auto* mesh : meshes) {
 				// add rotation to the sphere
-				//worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
+				worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
 
 				// stage the mesh's buffers as the ones to use
 				// set the vertex buffer to active in the input assembler

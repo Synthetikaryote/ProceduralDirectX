@@ -1,6 +1,8 @@
 // globals
 Texture2D tex : register(t0);
 TextureCube cubeTexture : register(t1);
+Texture2D spec : register(t2);
+Texture2D normalMap : register(t3);
 SamplerState SampleType;
 
 cbuffer MaterialBuffer : register(b0) {
@@ -19,37 +21,49 @@ cbuffer LightingBuffer : register(b1) {
 
 // typedefs
 struct VertexShaderOutput {
-    float4 position : SV_POSITION;
-    float3 tex : TEXCOORD0;
-    float3 normal : TEXCOORD1;
-    float3 dirToLight : TEXCOORD2;
-    float3 dirToView : TEXCOORD3;
+	float4 position : SV_POSITION;
+	float3 tex : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+	float3 tangent : TEXCOORD2;
+	float3 dirToLight : TEXCOORD3;
+	float3 dirToView : TEXCOORD4;
 };
 
 // pixel shader
 float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
 	float4 ambient = saturate(lightAmbient * materialAmbient);
 
-	float4 diffuseColor;
-	[branch] switch (slotsUsed) {
-		case 1:
-			diffuseColor = tex.Sample(SampleType, input.tex.xy);
-			break;
-		case 2:
-			diffuseColor = cubeTexture.Sample(SampleType, input.tex);
-			break;
-		default:
-			diffuseColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
-			break;
-	}
-    diffuseColor.w = 1.0f;
+	// diffuse
+	float4 diffuseColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
+	[branch] if (slotsUsed & 1 << 0)
+		diffuseColor = tex.Sample(SampleType, input.tex.xy);
+	[branch] if (slotsUsed & 1 << 1)
+		diffuseColor = cubeTexture.Sample(SampleType, input.tex);
+	diffuseColor.w = 1.0f;
 
-    float3 dirToLight = normalize(input.dirToLight);
-    float3 dirToView = normalize(input.dirToView);
-    float3 normal = normalize(input.normal);
-    float d = saturate(dot(dirToLight, normal));
+	// specular
+	float specularColor = 0.f;
+	[branch] if (slotsUsed & 1 << 2)
+		specularColor = spec.Sample(SampleType, input.tex.xy);
+
+	float3 dirToLight = normalize(input.dirToLight);
+	float3 dirToView = normalize(input.dirToView);
+	float3 normal = normalize(input.normal);
+
+	// normal map
+	float bumpIntensity = 1.0f;
+	float3 bumpNormal = normal;
+	[branch] if (slotsUsed & 1 << 3) {
+		float3 tangent = normalize(input.tangent);
+		float3 binormal = cross(tangent, normal);
+		float3 normalSample = normalMap.Sample(SampleType, input.tex.xy);
+		normalSample = (normalSample * 2.0f) - 1.0f;
+		bumpNormal = normalize((normalSample.x * tangent) + (normalSample.y * binormal) + (normalSample.z * normal));
+	}
+
+	float d = saturate(dot(dirToLight, bumpNormal));
     float intensity = 1.0f;
-    float4 diffuse = intensity * d * lightDiffuse * materialDiffuse;
+	float4 diffuse = intensity * d * lightDiffuse * materialDiffuse;
 
     float3 reflected = reflect(-dirToLight, normal);
     float shininess = 3.0f;
@@ -57,5 +71,6 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
     float s = pow(saturate(rdv), shininess);
     float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
 
-    return (diffuse + ambient) * diffuseColor + specular;
+	return (diffuse + ambient) * diffuseColor + (specular * specularColor);
+	//return specularColor;
 }

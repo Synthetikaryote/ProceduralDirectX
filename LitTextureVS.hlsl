@@ -21,15 +21,17 @@ cbuffer LightingBuffer : register(b2) {
 // typedefs
 struct VertexShaderInput {
     float4 position : POSITION;
-    float4 normal : NORMAL;
-    float3 tex : TEXCOORD0;
+	float4 normal : NORMAL;
+	float4 tangent : TANGENT;
+	float3 tex : TEXCOORD0;
 };
 struct VertexShaderOutput {
     float4 position : SV_POSITION;
     float3 tex : TEXCOORD0;
     float3 normal : TEXCOORD1;
-    float3 dirToLight : TEXCOORD2;
-    float3 dirToView : TEXCOORD3;
+	float3 tangent : TEXCOORD2;
+	float3 dirToLight : TEXCOORD3;
+    float3 dirToView : TEXCOORD4;
 };
 
 // vertex shader
@@ -49,6 +51,7 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 
 	// store the texture coordinates for the pixel shader
     output.normal = mul(input.normal, worldMatrix).xyz;
+	output.tangent = mul(input.tangent, worldMatrix).xyz;
     output.dirToLight = -lightDirection.xyz;
     output.dirToView = viewPosition.xyz - posWorld.xyz;
     output.tex = input.tex;

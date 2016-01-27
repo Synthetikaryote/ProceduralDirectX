@@ -69,7 +69,6 @@ void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsig
 	TargaHeader targaHeader;
 	assert(fopen_s(&filePtr, path.c_str(), "rb") == 0);
 	assert((unsigned)fread(&targaHeader, sizeof(TargaHeader), 1, filePtr) == 1);
-	assert(targaHeader.bpp == 32 || targaHeader.bpp == 24);
 	unsigned bytespp = targaHeader.bpp / 8;
 	w = targaHeader.width; h = targaHeader.height;
 	unsigned imageSize = w * h * bytespp;
@@ -84,10 +83,18 @@ void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsig
 	// targa stores it upside down, so go through the rows backwards
 	for (int r = (int)targaHeader.height - 1; r >= 0; --r) { // signed because it must become -1
 		for (unsigned j = r * targaHeader.width * bytespp; j < (r + 1) * targaHeader.width * bytespp; j += bytespp) {
-			data[n++] = imageData[j + 2]; // red
-			data[n++] = imageData[j + 1]; // green
-			data[n++] = imageData[j + 0]; // blue
-			data[n++] = bytespp == 4 ? imageData[j + 3] : 255; // alpha
+			if (bytespp == 1) {
+				data[n++] = imageData[j]; // red
+				data[n++] = imageData[j]; // green
+				data[n++] = imageData[j]; // blue
+				data[n++] = 255; // alpha
+			}
+			else {
+				data[n++] = imageData[j + 2]; // red
+				data[n++] = imageData[j + 1]; // green
+				data[n++] = imageData[j + 0]; // blue
+				data[n++] = bytespp >= 4 ? imageData[j + 3] : 255; // alpha
+			}
 		}
 	}
 	delete[] imageData;
@@ -105,8 +112,7 @@ ID3D11Texture2D* CreateTexture2D(string path) {
 	subresources[0].SysMemPitch = w * 4;
 	subresources[0].SysMemSlicePitch = w * h * 4;
 	ID3D11Texture2D* tex;
-	ComPtr<ID3D11Device>& device = Uber::I().device;
-	ThrowIfFailed(device->CreateTexture2D(&textureDesc, NULL, &tex));
+	ThrowIfFailed(Uber::I().device->CreateTexture2D(&textureDesc, NULL, &tex));
 	Uber::I().context->UpdateSubresource(tex, D3D11CalcSubresource(0, 0, textureDesc.MipLevels), NULL, textureData, w * 4, w * h * 4);
 	delete[] textureData;
 	return tex;

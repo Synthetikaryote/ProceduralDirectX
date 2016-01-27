@@ -20,6 +20,7 @@ struct VertexTextureType {
 struct Vertex {
 	XMFLOAT4 position;
 	XMFLOAT4 normal;
+	XMFLOAT4 tangent;
 	XMFLOAT3 texture;
 };
 
@@ -44,7 +45,10 @@ public:
 	void Release() override;
 	void Draw();
 
+	static Mesh* LoadQuad();
+	static Mesh* LoadPlane(unsigned columns = 1, unsigned rows = 1);
 	static Mesh* LoadCubeSphere(unsigned gridSize = 10);
+	static Mesh* LoadSphere(unsigned longitudes = 24, unsigned latitudes = 24);
 	static Mesh* LoadFromFile(string path);
 	void CreateBuffers();
 };
