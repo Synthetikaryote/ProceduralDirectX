@@ -1,4 +1,7 @@
 // globals
+Texture2D heightMap : register(t0);
+SamplerState SampleType;
+
 cbuffer MatrixBuffer : register(b0) {
     matrix worldMatrix;
     matrix viewMatrix;
@@ -8,7 +11,8 @@ cbuffer MaterialBuffer : register(b1) {
     float4 materialAmbient;
     float4 materialDiffuse;
     float4 materialSpecular;
-	uint flags;
+	uint vsSlotsUsed;
+	uint psSlotsUsed;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;
@@ -44,13 +48,21 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 	// Set the w of the normal to be 0 so it doesn't get translated when rotated.
 	//input.normal.w = 0.0f;
 
+	// height displacement
+	float4 position = input.position;
+	[branch] if (vsSlotsUsed & 1 << 0) {
+		float heightSample = heightMap.SampleLevel(SampleType, input.tex.xy, 0).x;
+		position = float4(position.xyz + input.normal.xyz * heightSample * 0.02f, 1.0f);
+	}
+
 	// Calculate the position of the vertex against the world, view, and projection matrices.
-    float4 posWorld = mul(input.position, worldMatrix);
+    float4 posWorld = mul(position, worldMatrix);
     output.position = mul(posWorld, viewMatrix);
     output.position = mul(output.position, projectionMatrix);
 
 	// store the texture coordinates for the pixel shader
     output.normal = mul(input.normal, worldMatrix).xyz;
+
 	output.tangent = mul(input.tangent, worldMatrix).xyz;
     output.dirToLight = -lightDirection.xyz;
     output.dirToView = viewPosition.xyz - posWorld.xyz;

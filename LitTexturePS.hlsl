@@ -9,7 +9,8 @@ cbuffer MaterialBuffer : register(b0) {
     float4 materialAmbient;
     float4 materialDiffuse;
     float4 materialSpecular;
-	uint slotsUsed;
+	uint vsSlotsUsed;
+	uint psSlotsUsed;
 };
 cbuffer LightingBuffer : register(b1) {
     float4 viewPosition;
@@ -35,16 +36,16 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
 
 	// diffuse
 	float4 diffuseColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
-	[branch] if (slotsUsed & 1 << 0)
+	[branch] if (psSlotsUsed & 1 << 0)
 		diffuseColor = tex.Sample(SampleType, input.tex.xy);
-	[branch] if (slotsUsed & 1 << 1)
+	[branch] if (psSlotsUsed & 1 << 1)
 		diffuseColor = cubeTexture.Sample(SampleType, input.tex);
 	diffuseColor.w = 1.0f;
 
 	// specular
 	float specularColor = 0.f;
-	[branch] if (slotsUsed & 1 << 2)
-		specularColor = spec.Sample(SampleType, input.tex.xy);
+	[branch] if (psSlotsUsed & 1 << 2)
+		specularColor = spec.Sample(SampleType, input.tex.xy).x;
 
 	float3 dirToLight = normalize(input.dirToLight);
 	float3 dirToView = normalize(input.dirToView);
@@ -53,10 +54,10 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
 	// normal map
 	float bumpIntensity = 1.0f;
 	float3 bumpNormal = normal;
-	[branch] if (slotsUsed & 1 << 3) {
+	[branch] if (psSlotsUsed & 1 << 3) {
 		float3 tangent = normalize(input.tangent);
 		float3 binormal = cross(tangent, normal);
-		float3 normalSample = normalMap.Sample(SampleType, input.tex.xy);
+		float3 normalSample = normalMap.Sample(SampleType, input.tex.xy).xyz;
 		normalSample = (normalSample * 2.0f) - 1.0f;
 		bumpNormal = normalize((normalSample.x * tangent) + (normalSample.y * binormal) + (normalSample.z * normal));
 	}

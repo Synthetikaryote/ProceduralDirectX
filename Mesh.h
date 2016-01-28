@@ -24,8 +24,14 @@ struct Vertex {
 	XMFLOAT3 texture;
 };
 
+enum ShaderType {
+	ShaderTypePixel = 0,
+	ShaderTypeVertex = 1
+};
+
 struct TextureBinding {
 	Texture* texture;
+	ShaderType shaderType;
 	unsigned shaderSlot;
 };
 

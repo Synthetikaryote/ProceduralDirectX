@@ -35,8 +35,16 @@ void Mesh::Release() {
 
 void Mesh::Draw() {
 	// give the pixel shader the textures
-	for (auto& binding : textureBindings)
-		Uber::I().context->PSSetShaderResources(binding.shaderSlot, 1, &binding.texture->shaderResourceView);
+	for (auto& binding : textureBindings) {
+		switch (binding.shaderType) {
+			case ShaderTypeVertex:
+				Uber::I().context->VSSetShaderResources(binding.shaderSlot, 1, &binding.texture->shaderResourceView);
+				break;
+			case ShaderTypePixel:
+				Uber::I().context->PSSetShaderResources(binding.shaderSlot, 1, &binding.texture->shaderResourceView);
+				break;
+		}
+	}
 
 	// render the mesh
 	Uber::I().context->DrawIndexed(indexCount, 0, 0);

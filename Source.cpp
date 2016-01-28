@@ -336,15 +336,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//	paths[i] = string(fileName);
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
-	Mesh* world = Mesh::LoadSphere(100, 100);
+	Mesh* world = Mesh::LoadSphere(300, 300);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
+	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
 	Texture* specularTexture = Texture::Load(string("8081-earthspec4k.jpg"));
 	Texture* normalTexture = Texture::Load(string("8081-earthnormal4k.jpg"));
-	TextureBinding diffuseBinding = {diffuseTexture, diffuseTexture->isTextureCube ? 1 : 0};
-	TextureBinding specularBinding = {specularTexture, 2};
-	TextureBinding normalBinding = {normalTexture, 3};
-	world->textureBindings = {diffuseBinding, specularBinding, normalBinding};
+	TextureBinding heightBinding = {heightTexture, ShaderTypeVertex, 0};
+	TextureBinding diffuseBinding = {diffuseTexture, ShaderTypePixel, diffuseTexture->isTextureCube ? 1 : 0};
+	TextureBinding specularBinding = {specularTexture, ShaderTypePixel, 2};
+	TextureBinding normalBinding = {normalTexture, ShaderTypePixel, 3};
+	world->textureBindings = {heightBinding, diffuseBinding, specularBinding, normalBinding};
 	world->shader = litTexture;
 	
 	//auto* duckTexture = Texture::Load(string("Models/duck.tga"));
@@ -494,9 +496,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-				materialBuffer.data.slotsUsed = 0;
-				for (auto& binding : mesh->textureBindings)
-					materialBuffer.data.slotsUsed |= 1 << binding.shaderSlot;
+				materialBuffer.data.vsSlotsUsed = 0;
+				materialBuffer.data.psSlotsUsed = 0;
+				for (auto& binding : mesh->textureBindings) {
+					switch (binding.shaderType) {
+						case ShaderTypeVertex:
+							materialBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
+							break;
+						case ShaderTypePixel:
+							materialBuffer.data.psSlotsUsed |= 1 << binding.shaderSlot;
+							break;
+					}
+				}
 				materialBuffer.UpdateSubresource();
 
 				mesh->Draw();

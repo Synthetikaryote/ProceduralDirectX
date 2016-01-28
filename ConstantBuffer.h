@@ -13,8 +13,8 @@ struct MaterialBufferType {
 	XMFLOAT4 materialAmbient;
 	XMFLOAT4 materialDiffuse;
 	XMFLOAT4 materialSpecular;
-	unsigned slotsUsed;
-	unsigned padding[3]; // must be a multiple of 16 bytes
+	unsigned vsSlotsUsed;
+	unsigned psSlotsUsed;
 };
 struct LightingBufferType {
 	XMFLOAT4 viewPosition;
@@ -34,6 +34,7 @@ public:
 		D3D11_BUFFER_DESC desc;
 		desc.Usage = D3D11_USAGE_DEFAULT;
 		const unsigned typeSize = sizeof(T);
+		// must be a multiple of 16 bytes
 		desc.ByteWidth = (typeSize % 16) ? ((typeSize / 16) + 1) * 16 : typeSize;
 		desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		desc.CPUAccessFlags = 0;

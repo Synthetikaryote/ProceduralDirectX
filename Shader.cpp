@@ -17,6 +17,7 @@ Shader::~Shader() {
 void Shader::SwitchTo() {
 	// set the vertex and pixel shaders that will be used to render this mesh
 	Uber::I().context->VSSetShader(vertexShader, NULL, 0);
+	Uber::I().context->VSSetSamplers(0, 1, &samplerState);
 	Uber::I().context->PSSetShader(pixelShader, NULL, 0);
 	Uber::I().context->PSSetSamplers(0, 1, &samplerState);
 
