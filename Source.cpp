@@ -336,11 +336,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//	paths[i] = string(fileName);
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
-	Mesh* world = Mesh::LoadSphere();
+	Mesh* world = Mesh::LoadSphere(100, 100);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
-	Texture* diffuseTexture = Texture::Load(string("earth.tga"));
-	Texture* specularTexture = Texture::Load(string("earth_spec.tga"));
-	Texture* normalTexture = Texture::Load(string("earth_normal.tga"));
+	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
+	Texture* specularTexture = Texture::Load(string("8081-earthspec4k.jpg"));
+	Texture* normalTexture = Texture::Load(string("8081-earthnormal4k.jpg"));
 	TextureBinding diffuseBinding = {diffuseTexture, diffuseTexture->isTextureCube ? 1 : 0};
 	TextureBinding specularBinding = {specularTexture, 2};
 	TextureBinding normalBinding = {normalTexture, 3};

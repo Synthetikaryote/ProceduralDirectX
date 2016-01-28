@@ -4,13 +4,13 @@
 #include <d3d11_2.h>
 using namespace std;
 
-struct TargaHeader {
-	unsigned char data1[12];
-	unsigned short width;
-	unsigned short height;
-	unsigned char bpp;
-	unsigned char data2;
-};
+//struct TargaHeader {
+//	unsigned char data1[12];
+//	unsigned short width;
+//	unsigned short height;
+//	unsigned char bpp;
+//	unsigned char data2;
+//};
 
 class Texture : public Resource {
 public:
@@ -19,6 +19,7 @@ public:
 	~Texture();
 
 	ID3D11Texture2D* texture;
+	DXGI_FORMAT format;
 	ID3D11ShaderResourceView* shaderResourceView;
 	bool isTextureCube = false;
 
