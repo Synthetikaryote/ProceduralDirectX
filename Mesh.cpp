@@ -122,11 +122,11 @@ void Mesh::CreateBuffers() {
 	assert(vertices);
 	assert(indices);
 
-	D3D11_BUFFER_DESC vertexDesc = {sizeof(Vertex) * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u};
-	D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
+	D3D11_BUFFER_DESC vertexDesc = { sizeof(Vertex) * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u };
+	D3D11_SUBRESOURCE_DATA vertexData = { vertices, 0u, 0u };
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &vertexBuffer));
-	D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u};
-	D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
+	D3D11_BUFFER_DESC indexDesc = { sizeof(unsigned long) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u };
+	D3D11_SUBRESOURCE_DATA indexData = { indices, 0u, 0u };
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &indexBuffer));
 }
 
@@ -256,12 +256,12 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 		for (unsigned r = 0; r < w + 1; ++r) {
 			for (unsigned c = 0; c < w + 1; ++c) {
 				switch (i) {
-					case 0: { p = {w, r, w - c, i}; break; } // right
-					case 1: { p = {0, r, c, i}; break; } // left
-					case 2: { p = {c, 0, r, i}; break; } // up
-					case 3: { p = {c, w, w - r, i}; break; } // down
-					case 4: { p = {c, r, w, i}; break; } // front
-					case 5: { p = {w - c, r, 0, i}; break; } // back
+					case 0: { p = { w, r, w - c, i }; break; } // right
+					case 1: { p = { 0, r, c, i }; break; } // left
+					case 2: { p = { c, 0, r, i }; break; } // up
+					case 3: { p = { c, w, w - r, i }; break; } // down
+					case 4: { p = { c, r, w, i }; break; } // front
+					case 5: { p = { w - c, r, 0, i }; break; } // back
 				}
 				indexRef[p] = v;
 				float x = p.x * 2.f / w - 1, y = (w - p.y) * 2.f / w - 1, z = (w - p.z) * 2.f / w - 1;
@@ -291,7 +291,7 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 			case 4: { x = c, y = r, z = w; break; } // front
 			case 5: { x = w - c, y = r, z = 0; break; } // back
 		}
-		return indexRef.at({x, y, z, i});
+		return indexRef.at({ x, y, z, i });
 	};
 	for (unsigned i = 0; i < 6; ++i) {
 		for (unsigned r = 0; r < w; ++r) {

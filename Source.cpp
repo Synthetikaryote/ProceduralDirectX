@@ -25,6 +25,7 @@
 #include "Mesh.h"
 #include "ResourceManager.h"
 #include "Camera.h"
+#include "Model.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -44,7 +45,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	
+
 
 
 	// clear out the window class for use
@@ -66,8 +67,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 2000 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 1600 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 1000 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -293,7 +294,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float fieldOfView = PI / 4.0f;
 	float screenAspect = (float)screenWidth / (float)screenHeight;
 	float screenDepth = 1000.0f;
-	float screenNear = 0.0001f;
+	float screenNear = 0.00001f;
 	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, screenAspect, screenNear, screenDepth);
 
 	// create the world matrix
@@ -312,19 +313,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ConstantBuffer<LightingBufferType> lightingBuffer;
 
 	// shaders
-	D3D11_SAMPLER_DESC samplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
-	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", {
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
-	}, samplerDesc
-	);
+	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
+	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", { { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 } }, samplerDesc);
 	// set up the vertex and pixel shader constant buffers
 	// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
-	litTexture->vertexShaderConstantBuffers = {matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer};
+	litTexture->vertexShaderConstantBuffers = { matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer };
 	// the pixel shader just needs material and lighting in its 0, 1 spots
-	litTexture->pixelShaderConstantBuffers = {materialBuffer.buffer, lightingBuffer.buffer};
+	litTexture->pixelShaderConstantBuffers = { materialBuffer.buffer, lightingBuffer.buffer };
 
 	// make a cube sphere
 	// texture
@@ -336,27 +331,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//	paths[i] = string(fileName);
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
-	Mesh* world = Mesh::LoadSphere(300, 300);
+	Model* world = new Model();
+	Mesh* worldMesh = Mesh::LoadSphere(300, 300);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
-	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
+	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
 	Texture* specularTexture = Texture::Load(string("8081-earthspec4k.jpg"));
 	Texture* normalTexture = Texture::Load(string("8081-earthnormal4k.jpg"));
-	TextureBinding heightBinding = {heightTexture, ShaderTypeVertex, 0};
-	TextureBinding diffuseBinding = {diffuseTexture, ShaderTypePixel, diffuseTexture->isTextureCube ? 1 : 0};
-	TextureBinding specularBinding = {specularTexture, ShaderTypePixel, 2};
-	TextureBinding normalBinding = {normalTexture, ShaderTypePixel, 3};
-	world->textureBindings = {heightBinding, diffuseBinding, specularBinding, normalBinding};
-	world->shader = litTexture;
-	
+	//TextureBinding heightBinding = { heightTexture, ShaderTypeVertex, 0 };
+	TextureBinding diffuseBinding = { diffuseTexture, ShaderTypePixel, diffuseTexture->isTextureCube ? 1 : 0 };
+	TextureBinding specularBinding = { specularTexture, ShaderTypePixel, 2 };
+	TextureBinding normalBinding = { normalTexture, ShaderTypePixel, 3 };
+	worldMesh->textureBindings = { /*heightBinding, */diffuseBinding, specularBinding, normalBinding };
+	worldMesh->shader = litTexture;
+	world->meshes.push_back(worldMesh);
+
 	//auto* duckTexture = Texture::Load(string("Models/duck.tga"));
 	//Mesh* duck = Mesh::LoadFromFile("duck.txt");
-	vector<Mesh*> meshes = {world};
+	vector<Model*> models = { world };
 
 	// set up the camera
 	Uber::I().camera = new Camera();
-	Uber::I().camera->binds = {DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL};
-	Uber::I().camera->sensitivity = 0.0002f;
+	Uber::I().camera->binds = { DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL };
+	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
+	Uber::I().camera->SetFocus(world);
 
 	// text
 	// create a white brush
@@ -420,9 +418,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				break;
 
 			if (IsKeyDown(DIK_1))
-				Uber::I().camera->focus = world;
+				Uber::I().camera->SetFocus(world);
 			if (IsKeyDown(DIK_2))
-				Uber::I().camera->focus = nullptr;
+				Uber::I().camera->SetFocus(nullptr);
 
 			// read the input
 			HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
@@ -469,69 +467,70 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			lightingBuffer.UpdateSubresource();
 
 			// clear the back buffer with the background color and clear the depth buffer
-			float color[4] = {0.f, 0.f, 0.f, 1.f};
+			float color[4] = { 0.f, 0.f, 0.f, 1.f };
 			context->ClearRenderTargetView(renderTargetView, color);
 			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-			for (auto* mesh : meshes) {
-				// add rotation to the sphere
-				worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.3f, 0.f);
+			for (auto* model : models) {
+				for (auto* mesh : model->meshes) {
+					// add rotation to the sphere
+					//worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.1f, 0.f);
 
-				// stage the mesh's buffers as the ones to use
-				// set the vertex buffer to active in the input assembler
-				
-				unsigned stride = sizeof(Vertex);
-				unsigned offset = 0;
-				context->IASetVertexBuffers(0, 1, &(mesh->vertexBuffer), &stride, &offset);
-				// set the index buffer to active in the input assembler
-				context->IASetIndexBuffer(mesh->indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-				// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
-				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+					// stage the mesh's buffers as the ones to use
+					// set the vertex buffer to active in the input assembler
 
-				// render the model using the lit texture shader
+					unsigned stride = sizeof(Vertex);
+					unsigned offset = 0;
+					context->IASetVertexBuffers(0, 1, &(mesh->vertexBuffer), &stride, &offset);
+					// set the index buffer to active in the input assembler
+					context->IASetIndexBuffer(mesh->indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+					// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
+					context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				mesh->shader->SwitchTo();
+					// render the model using the lit texture shader
 
-				// set the material settings
-				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-				materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-				materialBuffer.data.vsSlotsUsed = 0;
-				materialBuffer.data.psSlotsUsed = 0;
-				for (auto& binding : mesh->textureBindings) {
-					switch (binding.shaderType) {
-						case ShaderTypeVertex:
-							materialBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
-							break;
-						case ShaderTypePixel:
-							materialBuffer.data.psSlotsUsed |= 1 << binding.shaderSlot;
-							break;
+					mesh->shader->SwitchTo();
+
+					// set the material settings
+					materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+					materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+					materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+					materialBuffer.data.vsSlotsUsed = 0;
+					materialBuffer.data.psSlotsUsed = 0;
+					for (auto& binding : mesh->textureBindings) {
+						switch (binding.shaderType) {
+							case ShaderTypeVertex:
+								materialBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
+								break;
+							case ShaderTypePixel:
+								materialBuffer.data.psSlotsUsed |= 1 << binding.shaderSlot;
+								break;
+						}
 					}
+					materialBuffer.UpdateSubresource();
+
+					mesh->Draw();
 				}
-				materialBuffer.UpdateSubresource();
 
-				mesh->Draw();
+				// show the fps
+				++framesDrawn;
+				fpsElapsed += elapsed;
+				if (fpsElapsed >= fpsUpdateDelay) {
+					swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
+					fpsLength = (UINT32)wcslen(fps);
+					fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
+					fpsElapsed = 0;
+					framesDrawn = 0;
+				}
+				d2dContext->BeginDraw();
+				d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
+				d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
+				d2dContext->EndDraw();
 			}
-
-			// show the fps
-			++framesDrawn;
-			fpsElapsed += elapsed;
-			if (fpsElapsed >= fpsUpdateDelay) {
-				swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
-				fpsLength = (UINT32)wcslen(fps);
-				fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
-				fpsElapsed = 0;
-				framesDrawn = 0;
-			}
-			d2dContext->BeginDraw();
-			d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
-			d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
-			d2dContext->EndDraw();
-
-
-			// Present the back buffer to the screen since rendering is complete.
-			swapChain->Present(vsync ? 1 : 0, 0);
 		}
+
+		// Present the back buffer to the screen since rendering is complete.
+		swapChain->Present(vsync ? 1 : 0, 0);
 	}
 
 	// clean up
@@ -540,8 +539,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	keyboard->Unacquire();
 	keyboard->Release();
 	directInput->Release();
-	for (auto* mesh : meshes)
-		mesh->Release();
+	for (auto model : models) delete model;
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
 	delete Uber::I().camera;

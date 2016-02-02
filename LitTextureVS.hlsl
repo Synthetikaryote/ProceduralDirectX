@@ -11,8 +11,8 @@ cbuffer MaterialBuffer : register(b1) {
     float4 materialAmbient;
     float4 materialDiffuse;
     float4 materialSpecular;
-	uint vsSlotsUsed;
-	uint psSlotsUsed;
+    uint vsSlotsUsed;
+    uint psSlotsUsed;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;
@@ -25,16 +25,16 @@ cbuffer LightingBuffer : register(b2) {
 // typedefs
 struct VertexShaderInput {
     float4 position : POSITION;
-	float4 normal : NORMAL;
-	float4 tangent : TANGENT;
-	float3 tex : TEXCOORD0;
+    float4 normal : NORMAL;
+    float4 tangent : TANGENT;
+    float3 tex : TEXCOORD0;
 };
 struct VertexShaderOutput {
     float4 position : SV_POSITION;
     float3 tex : TEXCOORD0;
     float3 normal : TEXCOORD1;
-	float3 tangent : TEXCOORD2;
-	float3 dirToLight : TEXCOORD3;
+    float3 tangent : TEXCOORD2;
+    float3 dirToLight : TEXCOORD3;
     float3 dirToView : TEXCOORD4;
 };
 
@@ -49,11 +49,12 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 	//input.normal.w = 0.0f;
 
 	// height displacement
-	float4 position = input.position;
-	[branch] if (vsSlotsUsed & 1 << 0) {
-		float heightSample = heightMap.SampleLevel(SampleType, input.tex.xy, 0).x;
-		position = float4(position.xyz + input.normal.xyz * heightSample * 0.02f, 1.0f);
-	}
+    float4 position = input.position;
+	[branch]
+    if (vsSlotsUsed & 1 << 0) {
+        float heightSample = heightMap.SampleLevel(SampleType, input.tex.xy, 0).x;
+        position = float4(position.xyz + input.normal.xyz * heightSample * 0.01f, 1.0f);
+    }
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.
     float4 posWorld = mul(position, worldMatrix);
@@ -63,7 +64,7 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 	// store the texture coordinates for the pixel shader
     output.normal = mul(input.normal, worldMatrix).xyz;
 
-	output.tangent = mul(input.tangent, worldMatrix).xyz;
+    output.tangent = mul(input.tangent, worldMatrix).xyz;
     output.dirToLight = -lightDirection.xyz;
     output.dirToView = viewPosition.xyz - posWorld.xyz;
     output.tex = input.tex;

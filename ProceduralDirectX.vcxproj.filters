@@ -11,6 +11,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ConstantBuffer.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LitTexturePS.hlsl">
@@ -30,6 +31,7 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="Transform.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shaders">

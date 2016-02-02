@@ -1,6 +1,6 @@
 #pragma once
 #include <directxmath.h>
-class Mesh;
+class Model;
 
 struct MovementBinds {
 	unsigned char forward, left, back, right, up, down;
@@ -15,9 +15,15 @@ public:
 
 	XMFLOAT3 position, rotation, up, forward, velocity;
 	float yaw, pitch;
-	float sensitivity;
+	XMFLOAT3 sensitivity;
 	MovementBinds binds;
 
-	Mesh* focus;
+	void SetFocus(Model* focus);
+	Model* focus;
+	float focusDist;
+	float focusLinearZoom;
+	float zoomBase;
+	float focusYaw;
+	float focusPitch;
 };
 
