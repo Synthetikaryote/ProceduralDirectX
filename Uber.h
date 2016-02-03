@@ -59,4 +59,7 @@ public:
 	DIMOUSESTATE mouseState;
 	int mouseX = 0, mouseY = 0;
 	Camera* camera;
+	ID3D11RenderTargetView* renderTargetView;
+	ID3D11DepthStencilView* depthStencilView;
+	D3D11_VIEWPORT viewport;
 };

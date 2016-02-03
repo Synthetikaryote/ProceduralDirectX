@@ -30,11 +30,15 @@ void Camera::SetFocus(Model* focus) {
 		float dz = focus->transform->z - position.z;
 		focusDist = sqrtf(dx * dx + dy * dy + dz * dz);
 		focusLinearZoom = logf(focusDist) / logf(zoomBase);
-		focusYaw = atan2f(dz, dx) + HALFPI;
+		focusYaw = TWOPI - (yaw + PI);
+		//focusYaw = atan2f(dz, dx) + HALFPI;
 		focusPitch = asinf(-dy / focusDist);
+		position = XMFLOAT3(0.0f, 0.0f, -focusDist);
+		yaw = 0.0f;
+		pitch = 0.0f;
 	}
 	else {
-		yaw = TWOPI - (focusYaw + PI);
+		//yaw = TWOPI - (focusYaw + PI);
 	}
 	this->focus = focus;
 }
@@ -54,11 +58,12 @@ void Camera::Update(float elapsed) {
 		float zoomFactor = min(1.0f, closeness * 0.2f);
 		focusYaw = fmodf(focusYaw + sensitivity.x * zoomFactor * Uber::I().mouseState.lX, TWOPI);
 		focusPitch = max(-HALFPI, min(fmodf(focusPitch + sensitivity.y * zoomFactor * -Uber::I().mouseState.lY, TWOPI), HALFPI));
-		yaw = TWOPI - (focusYaw - PI);
-		pitch = focusPitch;
-		position.x = focusDist * cos(focusYaw + HALFPI) * cos(focusPitch);
-		position.y = focusDist * sin(focusPitch);
-		position.z = focusDist * sin(focusYaw + HALFPI) * cos(focusPitch);
+		//yaw = TWOPI - (focusYaw - PI);
+		//pitch = focusPitch;
+		//position.x = focusDist * cos(focusYaw + HALFPI) * cos(focusPitch);
+		//position.y = focusDist * sin(focusPitch);
+		//position.z = focusDist * sin(focusYaw + HALFPI) * cos(focusPitch);
+		position.z = -focusDist;
 	}
 	else {
 		yaw = fmodf(yaw + sensitivity.x * Uber::I().mouseState.lX, TWOPI);

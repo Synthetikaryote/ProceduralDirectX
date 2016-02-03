@@ -12,12 +12,19 @@
     <ClCompile Include="ConstantBuffer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Transform.cpp" />
+    <ClCompile Include="RenderTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LitTexturePS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="LitTextureVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="PostProcessVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="PostProcessPS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
@@ -32,6 +39,7 @@
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Transform.h" />
+    <ClInclude Include="RenderTarget.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shaders">

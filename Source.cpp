@@ -26,6 +26,7 @@
 #include "ResourceManager.h"
 #include "Camera.h"
 #include "Model.h"
+#include "RenderTarget.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -45,9 +46,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
-
-
 	// clear out the window class for use
 	ZeroMemory(&Uber::I().wc, sizeof(WNDCLASSEX));
 
@@ -190,8 +188,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	factory->CreateSwapChain(device.Get(), &swapChainDesc, &swapChain);
 	ID3D11Texture2D* backBuffer = 0;
 	swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
-	ID3D11RenderTargetView* renderTargetView;
-	device->CreateRenderTargetView(backBuffer, nullptr, &renderTargetView);
+	device->CreateRenderTargetView(backBuffer, nullptr, &Uber::I().renderTargetView);
 
 	adapterOutput->Release();
 	adapter->Release();
@@ -237,13 +234,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	context->OMSetDepthStencilState(depthStencilState, 1);  // make it take effect
 
 	// create the depth stencil view
-	ID3D11DepthStencilView* depthStencilView = nullptr;
 	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
 	ZeroMemory(&depthStencilViewDesc, sizeof(depthStencilViewDesc));
 	depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	depthStencilViewDesc.Texture2D.MipSlice = 0;
-	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilViewDesc, &depthStencilView);
+	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilViewDesc, &Uber::I().depthStencilView);
 
 	// custom raster options, like draw as wireframe
 	ID3D11RasterizerState* rasterState = nullptr;
@@ -262,14 +258,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	context->RSSetState(rasterState);
 
 	// set up the viewport
-	D3D11_VIEWPORT viewport;
-	viewport.Width = (float)screenWidth;
-	viewport.Height = (float)screenHeight;
-	viewport.MinDepth = 0.0f;
-	viewport.MaxDepth = 1.0f;
-	viewport.TopLeftX = 0.0f;
-	viewport.TopLeftY = 0.0f;
-	context->RSSetViewports(1, &viewport);
+	Uber::I().viewport.Width = (float)screenWidth;
+	Uber::I().viewport.Height = (float)screenHeight;
+	Uber::I().viewport.MinDepth = 0.0f;
+	Uber::I().viewport.MaxDepth = 1.0f;
+	Uber::I().viewport.TopLeftX = 0.0f;
+	Uber::I().viewport.TopLeftY = 0.0f;
+	context->RSSetViewports(1, &Uber::I().viewport);
 
 	// create a Direct2D target bitmap associated with the swap chain back buffer and set it as the current target
 	float dpiX = 300.0f;
@@ -306,6 +301,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
 
+	// post processing
+	// create the render target for the scene to render first, to allow post processing
+	RenderTarget sceneTarget(screenWidth, screenHeight, DXGI_FORMAT_B8G8R8A8_UNORM);
+	Mesh* screenMesh = new Mesh();
+	screenMesh->vertexCount = 4;
+	screenMesh->vertices = new Vertex[4];
+	screenMesh->vertices[0].position = XMFLOAT4(-1.0f, -1.0f, 0.0f, 1.0f);
+	screenMesh->vertices[1].position = XMFLOAT4(-1.0f, 1.0f, 0.0f, 1.0f);
+	screenMesh->vertices[2].position = XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
+	screenMesh->vertices[3].position = XMFLOAT4(1.0f, -1.0f, 0.0f, 1.0f);
+	screenMesh->vertices[0].texture = XMFLOAT3(0.0f, 1.0f, 0.0f);
+	screenMesh->vertices[1].texture = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	screenMesh->vertices[2].texture = XMFLOAT3(1.0f, 0.0f, 0.0f);
+	screenMesh->vertices[3].texture = XMFLOAT3(1.0f, 1.0f, 0.0f);
+	for (int i = 0; i < 4; ++i) {
+		screenMesh->vertices[i].normal = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		screenMesh->vertices[i].tangent = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	screenMesh->indexCount = 6;
+	screenMesh->indices = new unsigned long[6]{0, 1, 2, 0, 2, 3};
+	screenMesh->CreateBuffers();
+	Model* screen = new Model();
+	screen->meshes.push_back(screenMesh);
+	++screenMesh->refCount;
+	D3D11_SAMPLER_DESC postProcessSamplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
+	Shader* postProcessShader = Shader::LoadShader("PostProcessVS.cso", "PostProcessPS.cso", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, postProcessSamplerDesc);
+
 	// constant buffers that are in the shaders
 	// these lines create them in their constructor according to the type information
 	ConstantBuffer<MatrixBufferType> matrixBuffer;
@@ -332,7 +354,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(300, 300);
+	Mesh* worldMesh = Mesh::LoadSphere(30, 30);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -355,6 +377,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->binds = { DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL };
 	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
 	Uber::I().camera->SetFocus(world);
+	XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 
 	// text
 	// create a white brush
@@ -386,6 +409,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(mouse->SetDataFormat(&c_dfDIMouse));
 	ThrowIfFailed(mouse->SetCooperativeLevel(Uber::I().hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
 	mouse->Acquire();
+
+
+	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
 
 
 	// main loop
@@ -435,9 +461,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// update the camera
 			Uber::I().camera->Update(elapsed);
 
-			// bind the render target view and depth stencil buffer to the output render pipeline
-			context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
-
 			// generate the view matrix based on the camera
 			XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
 			XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
@@ -467,25 +490,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			lightingBuffer.UpdateSubresource();
 
 			// clear the back buffer with the background color and clear the depth buffer
-			float color[4] = { 0.f, 0.f, 0.f, 1.f };
-			context->ClearRenderTargetView(renderTargetView, color);
-			context->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+			float color[4] = {0.f, 0.f, 0.f, 1.f};
+			context->ClearRenderTargetView(Uber::I().renderTargetView, color);
+			context->ClearDepthStencilView(Uber::I().depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+			
+			// render everything to the scene render target to allow post processing
+			sceneTarget.BeginRender();
 
 			for (auto* model : models) {
 				for (auto* mesh : model->meshes) {
 					// add rotation to the sphere
-					//worldMatrix = XMMatrixRotationRollPitchYaw(0.f, time() * -0.1f, 0.f);
-
-					// stage the mesh's buffers as the ones to use
-					// set the vertex buffer to active in the input assembler
-
-					unsigned stride = sizeof(Vertex);
-					unsigned offset = 0;
-					context->IASetVertexBuffers(0, 1, &(mesh->vertexBuffer), &stride, &offset);
-					// set the index buffer to active in the input assembler
-					context->IASetIndexBuffer(mesh->indexBuffer, DXGI_FORMAT_R32_UINT, 0);
-					// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
-					context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+					//worldMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->focusPitch, Uber::I().camera->focusYaw, 0.f);
+					if (Uber::I().camera->focus) {
+						worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
+					}
+					else {
+						//worldMatrix = XMMatrixIdentity();
+					}
 
 					// render the model using the lit texture shader
 
@@ -511,26 +532,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 					mesh->Draw();
 				}
-
-				// show the fps
-				++framesDrawn;
-				fpsElapsed += elapsed;
-				if (fpsElapsed >= fpsUpdateDelay) {
-					swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
-					fpsLength = (UINT32)wcslen(fps);
-					fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
-					fpsElapsed = 0;
-					framesDrawn = 0;
-				}
-				d2dContext->BeginDraw();
-				d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
-				d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
-				d2dContext->EndDraw();
 			}
-		}
 
-		// Present the back buffer to the screen since rendering is complete.
-		swapChain->Present(vsync ? 1 : 0, 0);
+			// switch back to the back buffer
+			sceneTarget.EndRender();
+
+			// post processing
+			postProcessShader->SwitchTo();
+			sceneTarget.BindTexture(0);
+			screen->meshes[0]->Draw();
+			sceneTarget.UnbindTexture(0);
+
+			// show the fps
+			++framesDrawn;
+			fpsElapsed += elapsed;
+			if (fpsElapsed >= fpsUpdateDelay) {
+				swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
+				fpsLength = (UINT32)wcslen(fps);
+				fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
+				fpsElapsed = 0;
+				framesDrawn = 0;
+			}
+			d2dContext->BeginDraw();
+			d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
+			d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
+			d2dContext->EndDraw();
+
+			// Present the back buffer to the screen since rendering is complete.
+			swapChain->Present(vsync ? 1 : 0, 0);
+		}
 	}
 
 	// clean up
@@ -540,6 +570,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	keyboard->Release();
 	directInput->Release();
 	for (auto model : models) delete model;
+	delete screen;
+	postProcessShader->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
 	delete Uber::I().camera;
@@ -555,10 +587,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//if (colorVertexShader) colorVertexShader->Release();
 	if (rasterState) rasterState->Release();
 	//if (colorPixelShader) colorPixelShader->Release();
-	if (depthStencilView) depthStencilView->Release();
+	if (Uber::I().depthStencilView) Uber::I().depthStencilView->Release();
 	if (depthStencilState) depthStencilState->Release();
 	if (depthStencilBuffer) depthStencilBuffer->Release();
-	if (renderTargetView) renderTargetView->Release();
+	if (Uber::I().renderTargetView) Uber::I().renderTargetView->Release();
 	if (context) context->Release();
 	if (device) device.Get()->Release();
 	if (swapChain) swapChain->Release();

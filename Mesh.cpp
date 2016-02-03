@@ -46,6 +46,16 @@ void Mesh::Draw() {
 		}
 	}
 
+	// stage the mesh's buffers as the ones to use
+	// set the vertex buffer to active in the input assembler
+	unsigned stride = sizeof(Vertex);
+	unsigned offset = 0;
+	Uber::I().context->IASetVertexBuffers(0, 1, &(vertexBuffer), &stride, &offset);
+	// set the index buffer to active in the input assembler
+	Uber::I().context->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+	// Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
+	Uber::I().context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	// render the mesh
 	Uber::I().context->DrawIndexed(indexCount, 0, 0);
 }
@@ -188,28 +198,28 @@ Mesh* GeneratePlane(unsigned columns, unsigned rows) {
 // make a sphere
 Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes) {
 	Mesh* mesh = new Mesh();
-	mesh->vertexCount = (latitudes + 1) * (longitudes + 1);
-	mesh->indexCount = (latitudes - 1) * (longitudes + 1) * 2 * 3;
+	mesh->vertexCount = latitudes * (longitudes + 1);
+	mesh->indexCount = (latitudes - 2) * (longitudes + 1) * 2 * 3;
 	mesh->vertices = new Vertex[mesh->vertexCount];
 	mesh->indices = new unsigned long[mesh->indexCount];
-	const float latStep = PI / latitudes;
+	const float latStep = PI / (latitudes - 1);
 	const float lonStep = TWOPI / longitudes;
 	unsigned long v = 0;
-	for (unsigned lat = 0; lat <= latitudes; ++lat) {
+	for (unsigned lat = 0; lat < latitudes; ++lat) {
 		for (unsigned lon = 0; lon <= longitudes; ++lon) {
 			const float alat = lat * latStep;
 			const float alon = lon * lonStep;
-			mesh->vertices[v].position = XMFLOAT4(sin(alat) * cos(alon), cos(alat), sin(alat) * sin(alon), 1.0f);
+			mesh->vertices[v].position = XMFLOAT4(sinf(alat) * cosf(alon), cosf(alat), sinf(alat) * sinf(alon), 1.0f);
 			mesh->vertices[v].normal = mesh->vertices[v].position;
 			mesh->vertices[v].normal.w = 0.0f;
-			mesh->vertices[v].tangent = XMFLOAT4(sin(alat) * cos(alon + lonStep) - sin(alat) * cos(alon), 0.0f, sin(alat) * sin(alon + lonStep) - sin(alat) * sin(alon), 0.0f);
-			mesh->vertices[v++].texture = XMFLOAT3((float)lon / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
+			mesh->vertices[v].tangent = XMFLOAT4(sinf(alat) * cosf(alon + lonStep) - sinf(alat) * cosf(alon), 0.0f, sinf(alat) * sinf(alon + lonStep) - sinf(alat) * sinf(alon), 0.0f);
+			mesh->vertices[v++].texture = XMFLOAT3(static_cast<float>(lon) / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
 		}
 	}
 	unsigned index = 0;
-	for (unsigned lat = 0; lat < latitudes; ++lat) {
+	for (unsigned lat = 0; lat < latitudes - 1; ++lat) {
 		for (unsigned lon = 0; lon < longitudes; ++lon) {
-			if (lat != latitudes - 1) {
+			if (lat != latitudes - 2) {
 				mesh->indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
 				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
 				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
