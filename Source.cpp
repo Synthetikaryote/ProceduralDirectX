@@ -65,8 +65,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 1000 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 2000 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 1600 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -354,7 +354,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(30, 30);
+	Mesh* worldMesh = Mesh::LoadRecursiveHemisphere(16, 3);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -375,7 +375,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// set up the camera
 	Uber::I().camera = new Camera();
 	Uber::I().camera->binds = { DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL };
-	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
+	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.0002f };
 	Uber::I().camera->SetFocus(world);
 	XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 
@@ -434,133 +434,135 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			// check to see if it's time to quit
 			if (msg.message == WM_QUIT)
 				break;
+
+			// handle all window messages before rendering anything
+			continue;
 		}
-		else {
-			float elapsed = time() - lastFrameTime;
-			lastFrameTime = time();
 
-			// escape to quit
-			if (IsKeyDown(DIK_ESCAPE))
-				break;
+		float elapsed = time() - lastFrameTime;
+		lastFrameTime = time();
 
-			if (IsKeyDown(DIK_1))
-				Uber::I().camera->SetFocus(world);
-			if (IsKeyDown(DIK_2))
-				Uber::I().camera->SetFocus(nullptr);
+		// escape to quit
+		if (IsKeyDown(DIK_ESCAPE))
+			break;
 
-			// read the input
-			HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
-			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
-				keyboard->Acquire();
-			result = mouse->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
-			if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
-				mouse->Acquire();
-			Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
-			Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
+		if (IsKeyDown(DIK_1))
+			Uber::I().camera->SetFocus(world);
+		if (IsKeyDown(DIK_2))
+			Uber::I().camera->SetFocus(nullptr);
 
-			// update the camera
-			Uber::I().camera->Update(elapsed);
+		// read the input
+		HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
+		if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
+			keyboard->Acquire();
+		result = mouse->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
+		if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
+			mouse->Acquire();
+		Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
+		Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
 
-			// generate the view matrix based on the camera
-			XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
-			XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
-			XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
-			XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->pitch, Uber::I().camera->yaw, 0.f);
-			// rotate the forward and up according to the camera rotation
-			lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
-			upVector = XMVector3TransformCoord(upVector, rotationMatrix);
-			// move the forward vector to the target position
-			lookAtVector = XMVectorAdd(positionVector, lookAtVector);
-			// create the view matrix
-			XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
+		// update the camera
+		Uber::I().camera->Update(elapsed);
 
-			// update the constant buffers that are constant for all meshes
-			// shaders must receive transposed matrices in DirectX11
-			matrixBuffer.data.world = XMMatrixTranspose(worldMatrix);
-			matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
-			matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
-			matrixBuffer.UpdateSubresource();
+		// generate the view matrix based on the camera
+		XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+		XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
+		XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
+		XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->pitch, Uber::I().camera->yaw, 0.f);
+		// rotate the forward and up according to the camera rotation
+		lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
+		upVector = XMVector3TransformCoord(upVector, rotationMatrix);
+		// move the forward vector to the target position
+		lookAtVector = XMVectorAdd(positionVector, lookAtVector);
+		// create the view matrix
+		XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
 
-			// set the lightingBuffer information
-			lightingBuffer.data.lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
-			lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-			lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
-			lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-			XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
-			lightingBuffer.UpdateSubresource();
+		// update the constant buffers that are constant for all meshes
+		// shaders must receive transposed matrices in DirectX11
+		matrixBuffer.data.world = XMMatrixTranspose(worldMatrix);
+		matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
+		matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
+		matrixBuffer.UpdateSubresource();
 
-			// clear the back buffer with the background color and clear the depth buffer
-			float color[4] = {0.f, 0.f, 0.f, 1.f};
-			context->ClearRenderTargetView(Uber::I().renderTargetView, color);
-			context->ClearDepthStencilView(Uber::I().depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+		// set the lightingBuffer information
+		lightingBuffer.data.lightAmbient = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+		lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+		lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
+		lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+		XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
+		lightingBuffer.UpdateSubresource();
+
+		// clear the back buffer with the background color and clear the depth buffer
+		float color[4] = {0.f, 0.f, 0.f, 1.f};
+		context->ClearRenderTargetView(Uber::I().renderTargetView, color);
+		context->ClearDepthStencilView(Uber::I().depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 			
-			// render everything to the scene render target to allow post processing
-			sceneTarget.BeginRender();
+		// render everything to the scene render target to allow post processing
+		sceneTarget.BeginRender();
 
-			for (auto* model : models) {
-				for (auto* mesh : model->meshes) {
-					// add rotation to the sphere
-					//worldMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->focusPitch, Uber::I().camera->focusYaw, 0.f);
-					if (Uber::I().camera->focus) {
-						worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
-					}
-					else {
-						//worldMatrix = XMMatrixIdentity();
-					}
-
-					// render the model using the lit texture shader
-
-					mesh->shader->SwitchTo();
-
-					// set the material settings
-					materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-					materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-					materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-					materialBuffer.data.vsSlotsUsed = 0;
-					materialBuffer.data.psSlotsUsed = 0;
-					for (auto& binding : mesh->textureBindings) {
-						switch (binding.shaderType) {
-							case ShaderTypeVertex:
-								materialBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
-								break;
-							case ShaderTypePixel:
-								materialBuffer.data.psSlotsUsed |= 1 << binding.shaderSlot;
-								break;
-						}
-					}
-					materialBuffer.UpdateSubresource();
-
-					mesh->Draw();
+		for (auto* model : models) {
+			for (auto* mesh : model->meshes) {
+				// add rotation to the sphere
+				//worldMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->focusPitch, Uber::I().camera->focusYaw, 0.f);
+				if (Uber::I().camera->focus) {
+					worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				}
+				else {
+					//worldMatrix = XMMatrixIdentity();
+				}
+
+				// render the model using the lit texture shader
+
+				mesh->shader->SwitchTo();
+
+				// set the material settings
+				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				materialBuffer.data.materialDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+				materialBuffer.data.materialSpecular = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+				materialBuffer.data.vsSlotsUsed = 0;
+				materialBuffer.data.psSlotsUsed = 0;
+				for (auto& binding : mesh->textureBindings) {
+					switch (binding.shaderType) {
+						case ShaderTypeVertex:
+							materialBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
+							break;
+						case ShaderTypePixel:
+							materialBuffer.data.psSlotsUsed |= 1 << binding.shaderSlot;
+							break;
+					}
+				}
+				materialBuffer.UpdateSubresource();
+
+				mesh->Draw();
 			}
-
-			// switch back to the back buffer
-			sceneTarget.EndRender();
-
-			// post processing
-			postProcessShader->SwitchTo();
-			sceneTarget.BindTexture(0);
-			screen->meshes[0]->Draw();
-			sceneTarget.UnbindTexture(0);
-
-			// show the fps
-			++framesDrawn;
-			fpsElapsed += elapsed;
-			if (fpsElapsed >= fpsUpdateDelay) {
-				swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
-				fpsLength = (UINT32)wcslen(fps);
-				fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
-				fpsElapsed = 0;
-				framesDrawn = 0;
-			}
-			d2dContext->BeginDraw();
-			d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
-			d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
-			d2dContext->EndDraw();
-
-			// Present the back buffer to the screen since rendering is complete.
-			swapChain->Present(vsync ? 1 : 0, 0);
 		}
+
+		// switch back to the back buffer
+		sceneTarget.EndRender();
+
+		// post processing
+		postProcessShader->SwitchTo();
+		sceneTarget.BindTexture(0);
+		screen->meshes[0]->Draw();
+		sceneTarget.UnbindTexture(0);
+
+		// show the fps
+		++framesDrawn;
+		fpsElapsed += elapsed;
+		if (fpsElapsed >= fpsUpdateDelay) {
+			swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
+			fpsLength = (UINT32)wcslen(fps);
+			fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
+			fpsElapsed = 0;
+			framesDrawn = 0;
+		}
+		d2dContext->BeginDraw();
+		d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
+		d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
+		d2dContext->EndDraw();
+
+		// Present the back buffer to the screen since rendering is complete.
+		swapChain->Present(vsync ? 1 : 0, 0);
 	}
 
 	// clean up

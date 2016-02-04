@@ -11,6 +11,7 @@ using namespace std;
 Mesh* GeneratePlane(unsigned columns, unsigned rows);
 Mesh* GenerateCubeSphere(unsigned gridSize);
 Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes);
+Mesh* GenerateRecursiveHemisphere(unsigned gridSize, unsigned iterations);
 
 Mesh::Mesh() {
 }
@@ -91,6 +92,16 @@ Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
 
 	return Uber::I().resourceManager->Load<Mesh>(key, [gridSize] {
 		return GenerateCubeSphere(gridSize);
+	});
+}
+
+Mesh* Mesh::LoadRecursiveHemisphere(unsigned gridSize, unsigned iterations) {
+	char keyString[40];
+	sprintf_s(keyString, "MeshRecursiveHemisphere%u,%u", gridSize, iterations);
+	size_t key = hash<string>()(string(keyString));
+
+	return Uber::I().resourceManager->Load<Mesh>(key, [gridSize, iterations] {
+		return GenerateRecursiveHemisphere(gridSize, iterations);
 	});
 }
 
@@ -319,5 +330,52 @@ Mesh* GenerateCubeSphere(unsigned gridSize) {
 	// create the vertex and index buffers
 	mesh->CreateBuffers();
 
+	return mesh;
+}
+
+Mesh* GenerateRecursiveHemisphere(unsigned gridSize, unsigned iterations) {
+	Mesh* mesh = new Mesh();
+	assert(iterations >= 1);
+	unsigned lines = gridSize + 1;
+	mesh->vertexCount = lines * lines + (4 * lines * lines) * (iterations - 1);
+	mesh->indexCount = (gridSize * gridSize + (-4 + 4 * gridSize * gridSize) * (iterations - 1)) * 2 * 6;
+	mesh->vertices = new Vertex[mesh->vertexCount];
+	mesh->indices = new unsigned long[mesh->indexCount];
+
+	// start at the smallest level and move outward
+	unsigned halfGrid = gridSize / 2;
+	float step = 1.0f / powf(halfGrid, iterations);
+	float minBound = -static_cast<int>(halfGrid) * step;
+	int midLine = lines / 2;
+	unsigned long v = 0;
+	unsigned long index = 0;
+	for (unsigned i = 0; i < iterations; ++i) {
+		for (unsigned r = 0; r < lines; ++r) {
+			for (unsigned c = 0; c < lines; ++c) {
+				float pitch = (1.0f + minBound + r * step) * HALFPI;
+				float yaw = (1.0f + minBound + c * step) * HALFPI;
+				mesh->vertices[v].position = XMFLOAT4(sinf(pitch) * cosf(yaw), cosf(pitch), sinf(pitch) * sinf(yaw), 1.0f);
+				mesh->vertices[v].normal = mesh->vertices[v].position;
+				mesh->vertices[v].normal.w = 0.0f;
+				float nextYaw = (0.5f + minBound + (c + 1) * step) * HALFPI;
+				mesh->vertices[v].tangent = XMFLOAT4(sinf(pitch) * cosf(nextYaw) - sinf(pitch) * cosf(yaw), 0.0f, sinf(pitch) * sinf(nextYaw) - sinf(pitch) * sinf(yaw), 0.0f);
+				mesh->vertices[v].texture = XMFLOAT3((1.0f + minBound + c * step) * 0.25f, (1.0f + minBound + r * step) * 0.5f, 0.0f);
+				if (c < gridSize && r < gridSize) {
+					//if (i == 0 || (abs(midLine - static_cast<int>(c)) > 1 && abs(midLine - static_cast<int>(r)) > 1)) {
+						mesh->indices[index++] = v;
+						mesh->indices[index++] = v + 1;
+						mesh->indices[index++] = v + 1 + lines;
+						mesh->indices[index++] = v;
+						mesh->indices[index++] = v + 1 + lines;
+						mesh->indices[index++] = v + lines;
+					//}
+				}
+				++v;
+			}
+		}
+		step *= halfGrid;
+		minBound = -static_cast<int>(halfGrid) * step;
+	}
+	mesh->CreateBuffers();
 	return mesh;
 }

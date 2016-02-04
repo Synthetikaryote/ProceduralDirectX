@@ -55,6 +55,7 @@ public:
 	static Mesh* LoadPlane(unsigned columns = 1, unsigned rows = 1);
 	static Mesh* LoadCubeSphere(unsigned gridSize = 10);
 	static Mesh* LoadSphere(unsigned longitudes = 24, unsigned latitudes = 24);
+	static Mesh* LoadRecursiveHemisphere(unsigned gridSize = 4, unsigned iterations = 3);
 	static Mesh* LoadFromFile(string path);
 	void CreateBuffers();
 };
