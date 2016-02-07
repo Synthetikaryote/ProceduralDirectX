@@ -44,45 +44,71 @@ void Camera::SetFocus(Model* focus) {
 }
 
 void Camera::Update(float elapsed) {
-	if (GetActiveWindow() == Uber::I().hWnd) {
-		RECT r;
-		GetWindowRect(Uber::I().hWnd, &r);
-		SetCursorPos(static_cast<int>(static_cast<float>(r.right - r.left) * 0.5f), static_cast<int>(static_cast<float>(r.bottom - r.top) * 0.5f));
-	}
+	if (Uber::I().windowIsFocused) {
 
-	if (focus) {
-		float boundingRadius = 1.0f; // to do
+		// zoom
 		focusLinearZoom = max(-10.0f, min(10.0f, focusLinearZoom + sensitivity.z * -Uber::I().mouseState.lZ));
+		float boundingRadius = 1.0f; // to do
 		float closeness = powf(zoomBase, focusLinearZoom);
 		focusDist = boundingRadius + closeness;
 		float zoomFactor = min(1.0f, closeness * 0.2f);
-		focusYaw = fmodf(focusYaw + sensitivity.x * zoomFactor * Uber::I().mouseState.lX, TWOPI);
-		focusPitch = max(-HALFPI, min(fmodf(focusPitch + sensitivity.y * zoomFactor * -Uber::I().mouseState.lY, TWOPI), HALFPI));
-		//yaw = TWOPI - (focusYaw - PI);
-		//pitch = focusPitch;
-		//position.x = focusDist * cos(focusYaw + HALFPI) * cos(focusPitch);
-		//position.y = focusDist * sin(focusPitch);
-		//position.z = focusDist * sin(focusYaw + HALFPI) * cos(focusPitch);
-		position.z = -focusDist;
-	}
-	else {
-		yaw = fmodf(yaw + sensitivity.x * Uber::I().mouseState.lX, TWOPI);
-		pitch = max(-HALFPI, min(fmodf(pitch + sensitivity.y * Uber::I().mouseState.lY, TWOPI), HALFPI));
 
-		float speed = 2.f;
-		float x = (IsKeyDown(binds.left) ? -1.f : 0.f) + (IsKeyDown(binds.right) ? 1.f : 0.f);
-		float y = (IsKeyDown(binds.down) ? -1.f : 0.f) + (IsKeyDown(binds.up) ? 1.f : 0.f);
-		float z = (IsKeyDown(binds.back) ? -1.f : 0.f) + (IsKeyDown(binds.forward) ? 1.f : 0.f);
-		float lenSq = x * x + y * y + z * z;
-		if (lenSq > 0.f) {
-			float lenInv = 1.f / sqrt(lenSq);
-			x *= lenInv; y *= lenInv; z *= lenInv;
-			float py = y * cos(pitch) - z * sin(pitch), pz = y * sin(pitch) + z * cos(pitch);
-			float yx = x * cos(yaw) + pz * sin(yaw), yz = -x * sin(yaw) + pz * cos(yaw);
-			x = yx; y = py; z = yz;
-			float mult = speed * elapsed;
-			x *= mult; y *= mult; z *= mult;
-			position.x += x; position.y += y; position.z += z;
+		// hold right click to rotate
+		if (Uber::I().mouseState.rgbButtons[1]) {
+			if (Uber::I().cursorVisible) {
+				ShowCursor(false);
+				Uber::I().cursorVisible = false;
+				GetCursorPos(&Uber::I().savedMousePos);
+			}
+
+			if (GetActiveWindow() == Uber::I().hWnd) {
+				RECT r;
+				GetWindowRect(Uber::I().hWnd, &r);
+				SetCursorPos(static_cast<int>(static_cast<float>(r.right - r.left) * 0.5f), static_cast<int>(static_cast<float>(r.bottom - r.top) * 0.5f));
+			}
+
+			if (focus) {
+				focusYaw = fmodf(focusYaw + sensitivity.x * zoomFactor * Uber::I().mouseState.lX, TWOPI);
+				focusPitch = max(-HALFPI, min(fmodf(focusPitch + sensitivity.y * zoomFactor * -Uber::I().mouseState.lY, TWOPI), HALFPI));
+			}
+			else {
+				yaw = fmodf(yaw + sensitivity.x * Uber::I().mouseState.lX, TWOPI);
+				pitch = max(-HALFPI, min(fmodf(pitch + sensitivity.y * Uber::I().mouseState.lY, TWOPI), HALFPI));
+			}
+		}
+		else {
+			if (!Uber::I().cursorVisible) {
+				ShowCursor(true);
+				Uber::I().cursorVisible = true;
+				SetCursorPos(Uber::I().savedMousePos.x, Uber::I().savedMousePos.y);
+			}
+		}
+
+		// update position
+		if (focus) {
+			//yaw = TWOPI - (focusYaw - PI);
+			//pitch = focusPitch;
+			//position.x = focusDist * cos(focusYaw + HALFPI) * cos(focusPitch);
+			//position.y = focusDist * sin(focusPitch);
+			//position.z = focusDist * sin(focusYaw + HALFPI) * cos(focusPitch);
+			position.z = -focusDist;
+		}
+		else {
+			float speed = 2.f;
+			float x = (IsKeyDown(binds.left) ? -1.f : 0.f) + (IsKeyDown(binds.right) ? 1.f : 0.f);
+			float y = (IsKeyDown(binds.down) ? -1.f : 0.f) + (IsKeyDown(binds.up) ? 1.f : 0.f);
+			float z = (IsKeyDown(binds.back) ? -1.f : 0.f) + (IsKeyDown(binds.forward) ? 1.f : 0.f);
+			float lenSq = x * x + y * y + z * z;
+			if (lenSq > 0.f) {
+				float lenInv = 1.f / sqrt(lenSq);
+				x *= lenInv; y *= lenInv; z *= lenInv;
+				float py = y * cos(pitch) - z * sin(pitch), pz = y * sin(pitch) + z * cos(pitch);
+				float yx = x * cos(yaw) + pz * sin(yaw), yz = -x * sin(yaw) + pz * cos(yaw);
+				x = yx; y = py; z = yz;
+				float mult = speed * elapsed;
+				x *= mult; y *= mult; z *= mult;
+				position.x += x; position.y += y; position.z += z;
+			}
 		}
 	}
 }

@@ -62,4 +62,7 @@ public:
 	ID3D11RenderTargetView* renderTargetView;
 	ID3D11DepthStencilView* depthStencilView;
 	D3D11_VIEWPORT viewport;
+	bool cursorVisible = true;
+	POINT savedMousePos;
+	bool windowIsFocused = true;
 };

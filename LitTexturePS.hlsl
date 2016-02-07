@@ -72,7 +72,7 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
 
     float3 reflected = reflect(-dirToLight, normal);
     float shininess = 3.0f;
-	float s = pow(saturate(dot(reflected, dirToView)), shininess);
+    float s = pow(saturate(dot(reflected, dirToView)), shininess);
     float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
 
     return (diffuse + ambient) * diffuseColor + (specular * specularColor);

@@ -41,7 +41,6 @@ using namespace DirectX;
 using namespace std;
 using namespace Microsoft::WRL;
 
-POINT savedMousePos;
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // the entry point for any Windows program
@@ -54,10 +53,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().wc.style = CS_HREDRAW | CS_VREDRAW;
 	Uber::I().wc.lpfnWndProc = WindowProc;
 	Uber::I().wc.hInstance = hInstance;
-	Uber::I().wc.hCursor = NULL; // LoadCursor(NULL, IDC_ARROW);
+	Uber::I().wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	Uber::I().wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	Uber::I().wc.lpszClassName = L"WindowClass1";
-	ShowCursor(false);
 
 	// register the window class
 	RegisterClassEx(&Uber::I().wc);
@@ -65,8 +63,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 2000 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 1600 : GetSystemMetrics(SM_CYSCREEN);
+	int screenWidth = windowed ? 1600 : GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
 	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -301,6 +299,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
 
+	// constant buffers that are in the shaders
+	// these lines create them in their constructor according to the type information
+	ConstantBuffer<MatrixBufferType> matrixBuffer;
+	ConstantBuffer<MaterialBufferType> materialBuffer;
+	ConstantBuffer<LightingBufferType> lightingBuffer;
+
+	// shaders
 	// post processing
 	// create the render target for the scene to render first, to allow post processing
 	RenderTarget sceneTarget(screenWidth, screenHeight, DXGI_FORMAT_B8G8R8A8_UNORM);
@@ -325,16 +330,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Model* screen = new Model();
 	screen->meshes.push_back(screenMesh);
 	++screenMesh->refCount;
-	D3D11_SAMPLER_DESC postProcessSamplerDesc = {D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {0, 0, 0, 0}, 0, D3D11_FLOAT32_MAX};
-	Shader* postProcessShader = Shader::LoadShader("PostProcessVS.cso", "PostProcessPS.cso", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, postProcessSamplerDesc);
+	D3D11_SAMPLER_DESC postProcessSamplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
+	Shader* postProcessShader = Shader::LoadShader("PostProcessVS.cso", "PostProcessPS.cso", { { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 } }, postProcessSamplerDesc);
+	postProcessShader->pixelShaderConstantBuffers = { lightingBuffer.buffer };
 
-	// constant buffers that are in the shaders
-	// these lines create them in their constructor according to the type information
-	ConstantBuffer<MatrixBufferType> matrixBuffer;
-	ConstantBuffer<MaterialBufferType> materialBuffer;
-	ConstantBuffer<LightingBufferType> lightingBuffer;
-
-	// shaders
+	// lit texture
 	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	Shader* litTexture = Shader::LoadShader("LitTextureVS.cso", "LitTexturePS.cso", { { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 } }, samplerDesc);
 	// set up the vertex and pixel shader constant buffers
@@ -354,7 +354,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadRecursiveHemisphere(16, 3);
+	Mesh* worldMesh = Mesh::LoadSphere(300, 300);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -375,7 +375,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// set up the camera
 	Uber::I().camera = new Camera();
 	Uber::I().camera->binds = { DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL };
-	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.0002f };
+	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
 	Uber::I().camera->SetFocus(world);
 	XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 
@@ -412,6 +412,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
+
+	XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+	worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 
 
 	// main loop
@@ -465,7 +468,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		Uber::I().camera->Update(elapsed);
 
 		// generate the view matrix based on the camera
-		XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+		//XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
 		XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
 		XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
 		XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->pitch, Uber::I().camera->yaw, 0.f);
@@ -493,22 +496,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		lightingBuffer.UpdateSubresource();
 
 		// clear the back buffer with the background color and clear the depth buffer
-		float color[4] = {0.f, 0.f, 0.f, 1.f};
+		float color[4] = { 0.f, 0.f, 0.f, 1.f };
 		context->ClearRenderTargetView(Uber::I().renderTargetView, color);
 		context->ClearDepthStencilView(Uber::I().depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-			
+
 		// render everything to the scene render target to allow post processing
 		sceneTarget.BeginRender();
 
 		for (auto* model : models) {
 			for (auto* mesh : model->meshes) {
 				// add rotation to the sphere
-				//worldMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->focusPitch, Uber::I().camera->focusYaw, 0.f);
 				if (Uber::I().camera->focus) {
 					worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				}
 				else {
-					//worldMatrix = XMMatrixIdentity();
+					worldMatrix = XMMatrixIdentity();
 				}
 
 				// render the model using the lit texture shader
@@ -613,10 +615,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			return 0;
 		} break;
 		case WM_SETFOCUS:
-			GetCursorPos(&savedMousePos);
+			if (!Uber::I().cursorVisible) {
+				GetCursorPos(&Uber::I().savedMousePos);
+			}
+			Uber::I().windowIsFocused = true;
 			break;
 		case WM_KILLFOCUS:
-			SetCursorPos(savedMousePos.x, savedMousePos.y);
+			if (!Uber::I().cursorVisible) {
+				SetCursorPos(Uber::I().savedMousePos.x, Uber::I().savedMousePos.y);
+				ShowCursor(true);
+				Uber::I().cursorVisible = true;
+			}
+			Uber::I().windowIsFocused = false;
 			break;
 	}
 

@@ -2,13 +2,24 @@ SamplerState SampleType;
 Texture2D tex : register(t0);
 
 struct VertexShaderOutput {
-	float4 position : SV_POSITION;
-	float2 tex : TEXCOORD0;
+    float4 position : SV_POSITION;
+    float2 tex : TEXCOORD0;
+    float4 normal : TEXCOORD1;
 };
 
-float4 main(VertexShaderOutput input) : SV_TARGET
-{
-	float4 color = tex.Sample(SampleType, input.tex);
+cbuffer LightingBuffer : register(b0) {
+    float4 viewPosition;
+    float4 lightDirection;
+    float4 lightAmbient;
+    float4 lightDiffuse;
+    float4 lightSpecular;
+};
+
+float4 main(VertexShaderOutput input) : SV_TARGET {
+    float4 color = tex.Sample(SampleType, input.tex);
 	//color = (color.r + color.g + color.b) / 3.0f;
-	return color;
+    //float intensity = (color.r + color.g + color.b) / 3.0f;
+    //dot(normalize(lightDirection), input.normal);
+    //color = round(intensity * 5) / 5 * color;
+    return color;
 }
