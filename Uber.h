@@ -65,4 +65,10 @@ public:
 	bool cursorVisible = true;
 	POINT savedMousePos;
 	bool windowIsFocused = true;
+	unsigned screenWidth = 0;
+	unsigned screenHeight = 0;
+	unsigned windowWidth = 0;
+	unsigned windowHeight = 0;
+	unsigned windowLeft = 0;
+	unsigned windowTop = 0;
 };

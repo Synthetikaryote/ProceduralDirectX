@@ -64,7 +64,7 @@ void Camera::Update(float elapsed) {
 			if (GetActiveWindow() == Uber::I().hWnd) {
 				RECT r;
 				GetWindowRect(Uber::I().hWnd, &r);
-				SetCursorPos(static_cast<int>(static_cast<float>(r.right - r.left) * 0.5f), static_cast<int>(static_cast<float>(r.bottom - r.top) * 0.5f));
+				SetCursorPos(Uber::I().savedMousePos.x, Uber::I().savedMousePos.y);
 			}
 
 			if (focus) {
@@ -81,6 +81,11 @@ void Camera::Update(float elapsed) {
 				ShowCursor(true);
 				Uber::I().cursorVisible = true;
 				SetCursorPos(Uber::I().savedMousePos.x, Uber::I().savedMousePos.y);
+			}
+
+			// hold left click to use tool
+			if (Uber::I().mouseState.rgbButtons[0]) {
+
 			}
 		}
 

@@ -27,6 +27,7 @@
 #include "Camera.h"
 #include "Model.h"
 #include "RenderTarget.h"
+#include "Transform.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -63,9 +64,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	bool vsync = false;
 	bool windowed = true;
 
-	int screenWidth = windowed ? 1600 : GetSystemMetrics(SM_CXSCREEN);
-	int screenHeight = windowed ? 800 : GetSystemMetrics(SM_CYSCREEN);
-	RECT wr = { 0, 0, screenWidth, screenHeight };    // set the size, but not the position
+	Uber::I().screenWidth = static_cast<unsigned>(GetSystemMetrics(SM_CXSCREEN));
+	Uber::I().screenHeight = static_cast<unsigned>(GetSystemMetrics(SM_CYSCREEN));
+	Uber::I().windowWidth = windowed ? Uber::I().screenWidth * 0.75f : Uber::I().screenWidth;
+	Uber::I().windowHeight = windowed ? Uber::I().screenHeight * 0.75f : Uber::I().screenHeight;
+	Uber::I().windowLeft = windowed ? (Uber::I().screenWidth - Uber::I().windowWidth) * 0.5f : 0.0f;
+	Uber::I().windowTop = windowed ? (Uber::I().screenHeight - Uber::I().windowHeight) * 0.5f : 0.0f;
+	RECT wr = { 0, 0, Uber::I().windowWidth, Uber::I().windowHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
 	// create the window and use the result as the handle
@@ -73,8 +78,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		L"WindowClass1",    // name of the window class
 		L"ProceduralDirectX",   // title of the window
 		WS_OVERLAPPEDWINDOW,    // window style
-		300,    // x-position of the window
-		50,    // y-position of the window
+		Uber::I().windowLeft,    // x-position of the window
+		Uber::I().windowTop,    // y-position of the window
 		wr.right - wr.left,    // width of the window
 		wr.bottom - wr.top,    // height of the window
 		NULL,    // we have no parent window, NULL
@@ -135,8 +140,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
 	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
 	swapChainDesc.BufferCount = 2; // double buffering to reduce latency
-	swapChainDesc.BufferDesc.Width = screenWidth;
-	swapChainDesc.BufferDesc.Height = screenHeight;
+	swapChainDesc.BufferDesc.Width = Uber::I().windowWidth;
+	swapChainDesc.BufferDesc.Height = Uber::I().windowHeight;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.OutputWindow = Uber::I().hWnd;
@@ -159,7 +164,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		DXGI_MODE_DESC* displayModeList = new DXGI_MODE_DESC[numModes];
 		adapterOutput->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &numModes, displayModeList);
 		for (unsigned i = 0; i < numModes; i++) {
-			if (displayModeList[i].Width == (unsigned)screenWidth && displayModeList[i].Height == (unsigned)screenHeight) {
+			if (displayModeList[i].Width == Uber::I().windowWidth && displayModeList[i].Height == Uber::I().windowHeight) {
 				swapChainDesc.BufferDesc.RefreshRate.Numerator = displayModeList[i].RefreshRate.Numerator;
 				swapChainDesc.BufferDesc.RefreshRate.Denominator = displayModeList[i].RefreshRate.Denominator;
 				break;
@@ -197,8 +202,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11Texture2D* depthStencilBuffer = nullptr;
 	D3D11_TEXTURE2D_DESC depthBufferDesc;
 	ZeroMemory(&depthBufferDesc, sizeof(depthBufferDesc));
-	depthBufferDesc.Width = screenWidth;
-	depthBufferDesc.Height = screenHeight;
+	depthBufferDesc.Width = Uber::I().windowWidth;
+	depthBufferDesc.Height = Uber::I().windowHeight;
 	depthBufferDesc.MipLevels = 1;
 	depthBufferDesc.ArraySize = 1;
 	depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -256,8 +261,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	context->RSSetState(rasterState);
 
 	// set up the viewport
-	Uber::I().viewport.Width = (float)screenWidth;
-	Uber::I().viewport.Height = (float)screenHeight;
+	Uber::I().viewport.Width = static_cast<float>(Uber::I().windowWidth);
+	Uber::I().viewport.Height = static_cast<float>(Uber::I().windowHeight);
 	Uber::I().viewport.MinDepth = 0.0f;
 	Uber::I().viewport.MaxDepth = 1.0f;
 	Uber::I().viewport.TopLeftX = 0.0f;
@@ -285,7 +290,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// create the projection matrix
 	float fieldOfView = PI / 4.0f;
-	float screenAspect = (float)screenWidth / (float)screenHeight;
+	float screenAspect = static_cast<float>(Uber::I().windowWidth) / Uber::I().windowHeight;
 	float screenDepth = 1000.0f;
 	float screenNear = 0.00001f;
 	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, screenAspect, screenNear, screenDepth);
@@ -294,7 +299,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMMATRIX worldMatrix = XMMatrixIdentity();
 
 	// create an orthographic projection matrix for 2D UI rendering.
-	XMMATRIX orthoMatrix = XMMatrixOrthographicLH((float)screenWidth, (float)screenHeight, screenNear, screenDepth);
+	XMMATRIX orthoMatrix = XMMatrixOrthographicLH(static_cast<float>(Uber::I().windowWidth), static_cast<float>(Uber::I().windowHeight), screenNear, screenDepth);
 
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
@@ -308,7 +313,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// shaders
 	// post processing
 	// create the render target for the scene to render first, to allow post processing
-	RenderTarget sceneTarget(screenWidth, screenHeight, DXGI_FORMAT_B8G8R8A8_UNORM);
+	RenderTarget sceneTarget(Uber::I().windowWidth, Uber::I().windowHeight, DXGI_FORMAT_B8G8R8A8_UNORM);
 	Mesh* screenMesh = new Mesh();
 	screenMesh->vertexCount = 4;
 	screenMesh->vertices = new Vertex[4];
@@ -354,7 +359,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(300, 300);
+	Mesh* worldMesh = Mesh::LoadSphere(30, 30);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -424,7 +429,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float fpsElapsed = 1.f;
 	float fpsUpdateDelay = 0.5f;
 	UINT32 fpsLength = 0;
-	wchar_t fps[80];
+	wchar_t fps[255];
+	wchar_t message[255];
 	while (true) {
 		// Check to see if any messages are waiting in the queue
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -461,8 +467,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		result = mouse->GetDeviceState(sizeof(Uber::I().mouseState), (LPVOID)&Uber::I().mouseState);
 		if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
 			mouse->Acquire();
-		Uber::I().mouseX = max(0, min(Uber::I().mouseX + Uber::I().mouseState.lX, screenWidth));
-		Uber::I().mouseY = max(0, min(Uber::I().mouseY + Uber::I().mouseState.lY, screenHeight));
+		POINT windowMousePos;
+		GetCursorPos(&windowMousePos);
+		ScreenToClient(Uber::I().hWnd, &windowMousePos);
+		Uber::I().mouseX = windowMousePos.x;
+		Uber::I().mouseY = windowMousePos.y;
 
 		// update the camera
 		Uber::I().camera->Update(elapsed);
@@ -479,6 +488,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		lookAtVector = XMVectorAdd(positionVector, lookAtVector);
 		// create the view matrix
 		XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
+
+		// raycast the cursor position to find the spot on the model the camera is focusing on
+		// reference: http://richardssoftware.net/Home/Post/23
+		// put the mouse coords into -1, 1 space as the origin
+		float vx = (2.0f * Uber::I().mouseX / Uber::I().windowWidth - 1.0f) / XMVectorGetX(projectionMatrix.r[0]);
+		float vy = (-2.0f * Uber::I().mouseY / Uber::I().windowHeight + 1.0f) / XMVectorGetY(projectionMatrix.r[1]);
+		Transform& t = *Uber::I().camera->focus->transform;
+		XMVECTOR start = XMLoadFloat4(&XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
+		XMVECTOR end = XMLoadFloat4(&XMFLOAT4(vx, vy, 1.0f, 1.0f));
+		XMVECTOR dir = XMVectorSubtract(end, start);
+		XMMATRIX inverseView = XMMatrixInverse(nullptr, viewMatrix);
+		start = XMVector4Transform(start, inverseView);
+		end = XMVector4Transform(end, inverseView);
+		dir = XMVector4Transform(dir, inverseView);
+		dir = XMVector3Normalize(dir);
+		// find the intersection with the sphere
+		// reference: https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
+		// d = -(l . (o - c)) +- sqrt( (l . (o - c))^2 - (||o - c||^2 - r^2) )
+		// l = dir, o = start, c = center, r = 1
+		// if inside the sqrt is less than 0, there is no intersection
+		XMVECTOR center = XMLoadFloat4(&XMFLOAT4(t.x, t.y, t.z, 1.0f));
+		// delta = (o - c)
+		XMVECTOR delta = XMVectorSubtract(start, center);
+		XMFLOAT3 dotResult, lenResult;
+		XMStoreFloat3(&dotResult, XMVector3Dot(dir, delta));
+		XMStoreFloat3(&lenResult, XMVector3LengthSq(delta));
+		bool intersection = false;
+		float underSqrt = dotResult.x * dotResult.x - lenResult.x + 1.0f;
+		XMFLOAT3 mouseOver = XMFLOAT3(0.0f, 0.0f, 0.0f);
+		if (underSqrt >= 0) {
+			// 2 intersections, but always take the closer one
+			float sqrtResult = sqrtf(underSqrt);
+			float dist = -dotResult.x - sqrtResult;
+			XMStoreFloat3(&mouseOver, XMVectorAdd(start, XMVectorScale(dir, dist)));
+			intersection = true;
+		}
+		swprintf_s(message, L"mouseOver: %.2f,%.2f,%.2f", mouseOver.x, mouseOver.y, mouseOver.z);
+
 
 		// update the constant buffers that are constant for all meshes
 		// shaders must receive transposed matrices in DirectX11
@@ -561,6 +608,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		d2dContext->BeginDraw();
 		d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
 		d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
+		d2dContext->DrawTextW(message, (UINT32)wcslen(message), textFormat, D2D1::RectF(10.f, 120.f, 810.f, 110.f), whiteBrush);
 		d2dContext->EndDraw();
 
 		// Present the back buffer to the screen since rendering is complete.
@@ -615,9 +663,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			return 0;
 		} break;
 		case WM_SETFOCUS:
-			if (!Uber::I().cursorVisible) {
-				GetCursorPos(&Uber::I().savedMousePos);
-			}
 			Uber::I().windowIsFocused = true;
 			break;
 		case WM_KILLFOCUS:
