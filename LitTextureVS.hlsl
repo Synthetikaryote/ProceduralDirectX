@@ -36,6 +36,7 @@ struct VertexShaderOutput {
     float3 tangent : TEXCOORD2;
     float3 dirToLight : TEXCOORD3;
     float3 dirToView : TEXCOORD4;
+    float4 worldPos : TEXCOORD5;
 };
 
 // vertex shader
@@ -58,6 +59,7 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.
     float4 posWorld = mul(position, worldMatrix);
+    output.worldPos = posWorld;
     output.position = mul(posWorld, viewMatrix);
     output.position = mul(output.position, projectionMatrix);
 

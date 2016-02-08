@@ -309,6 +309,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ConstantBuffer<MatrixBufferType> matrixBuffer;
 	ConstantBuffer<MaterialBufferType> materialBuffer;
 	ConstantBuffer<LightingBufferType> lightingBuffer;
+	ConstantBuffer<BrushBufferType> brushBuffer;
 
 	// shaders
 	// post processing
@@ -346,7 +347,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// the vertex shader needs matrix, material, lighting in its 0, 1, 2 spots
 	litTexture->vertexShaderConstantBuffers = { matrixBuffer.buffer, materialBuffer.buffer, lightingBuffer.buffer };
 	// the pixel shader just needs material and lighting in its 0, 1 spots
-	litTexture->pixelShaderConstantBuffers = { materialBuffer.buffer, lightingBuffer.buffer };
+	litTexture->pixelShaderConstantBuffers = { materialBuffer.buffer, lightingBuffer.buffer, brushBuffer.buffer };
 
 	// make a cube sphere
 	// texture
@@ -516,15 +517,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		XMStoreFloat3(&lenResult, XMVector3LengthSq(delta));
 		bool intersection = false;
 		float underSqrt = dotResult.x * dotResult.x - lenResult.x + 1.0f;
-		XMFLOAT3 mouseOver = XMFLOAT3(0.0f, 0.0f, 0.0f);
+		XMFLOAT4 cursorPosition = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 		if (underSqrt >= 0) {
 			// 2 intersections, but always take the closer one
 			float sqrtResult = sqrtf(underSqrt);
 			float dist = -dotResult.x - sqrtResult;
-			XMStoreFloat3(&mouseOver, XMVectorAdd(start, XMVectorScale(dir, dist)));
+			XMStoreFloat4(&cursorPosition, XMVectorAdd(start, XMVectorScale(dir, dist)));
 			intersection = true;
 		}
-		swprintf_s(message, L"mouseOver: %.2f,%.2f,%.2f", mouseOver.x, mouseOver.y, mouseOver.z);
 
 
 		// update the constant buffers that are constant for all meshes
@@ -581,6 +581,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					}
 				}
 				materialBuffer.UpdateSubresource();
+
+				brushBuffer.data.cursorPosition = cursorPosition;
+				float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
+				brushBuffer.data.cursorRadius = (0.01f + closeness) * 0.1f + 0.01f;
+				swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadius);
+				brushBuffer.data.cursorLineThickness = (1.0f - Uber::I().camera->focusLinearZoom) * 0.1f;
+				brushBuffer.UpdateSubresource();
 
 				mesh->Draw();
 			}

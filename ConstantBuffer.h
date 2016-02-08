@@ -23,6 +23,11 @@ struct LightingBufferType {
 	XMFLOAT4 lightDiffuse;
 	XMFLOAT4 lightSpecular;
 };
+struct BrushBufferType {
+	XMFLOAT4 cursorPosition;
+	float cursorRadius;
+	float cursorLineThickness;
+};
 
 template <typename T>
 class ConstantBuffer {
