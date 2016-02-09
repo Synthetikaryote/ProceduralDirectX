@@ -29,6 +29,9 @@ struct BrushBufferType {
 	float cursorRadiusSq;
 	float cursorLineThickness;
 };
+struct PostProcessBufferType {
+	XMFLOAT2 windowSize;
+};
 
 template <typename T>
 class ConstantBuffer {

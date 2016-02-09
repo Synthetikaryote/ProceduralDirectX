@@ -54,7 +54,7 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 	[branch]
     if (vsSlotsUsed & 1 << 0) {
         float heightSample = heightMap.SampleLevel(SampleType, input.tex.xy, 0).x;
-        position = float4(position.xyz + input.normal.xyz * heightSample * 0.01f, 1.0f);
+        position = float4(position.xyz + input.normal.xyz * heightSample * 0.02f, 1.0f);
     }
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.

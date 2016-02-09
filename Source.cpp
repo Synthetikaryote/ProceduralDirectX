@@ -310,6 +310,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ConstantBuffer<MaterialBufferType> materialBuffer;
 	ConstantBuffer<LightingBufferType> lightingBuffer;
 	ConstantBuffer<BrushBufferType> brushBuffer;
+	ConstantBuffer<PostProcessBufferType> postProcessBuffer;
 
 	// shaders
 	// post processing
@@ -338,7 +339,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	++screenMesh->refCount;
 	D3D11_SAMPLER_DESC postProcessSamplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
 	Shader* postProcessShader = Shader::LoadShader("PostProcessVS.cso", "PostProcessPS.cso", { { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 } }, postProcessSamplerDesc);
-	postProcessShader->pixelShaderConstantBuffers = { lightingBuffer.buffer };
+	postProcessBuffer.data.windowSize = XMFLOAT2(Uber::I().windowWidth, Uber::I().windowHeight);
+	postProcessBuffer.UpdateSubresource();
+	postProcessShader->pixelShaderConstantBuffers = { lightingBuffer.buffer, postProcessBuffer.buffer };
 
 	// lit texture
 	D3D11_SAMPLER_DESC samplerDesc = { D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, { 0, 0, 0, 0 }, 0, D3D11_FLOAT32_MAX };
@@ -498,7 +501,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// put the mouse coords into -1, 1 space as the origin
 		float vx = (2.0f * Uber::I().mouseX / Uber::I().windowWidth - 1.0f) / XMVectorGetX(projectionMatrix.r[0]);
 		float vy = (-2.0f * Uber::I().mouseY / Uber::I().windowHeight + 1.0f) / XMVectorGetY(projectionMatrix.r[1]);
-		Transform& t = *Uber::I().camera->focus->transform;
+		Transform& t = *world->transform;
 		XMVECTOR start = XMLoadFloat4(&XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
 		XMVECTOR end = XMLoadFloat4(&XMFLOAT4(vx, vy, 1.0f, 1.0f));
 		XMVECTOR dir = XMVectorSubtract(end, start);
@@ -612,7 +615,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		++framesDrawn;
 		fpsElapsed += elapsed;
 		if (fpsElapsed >= fpsUpdateDelay) {
-			swprintf_s(fps, L"fps: %.2f   ", framesDrawn / fpsElapsed);
+			swprintf_s(fps, L"fps: %.2f", framesDrawn / fpsElapsed);
 			fpsLength = (UINT32)wcslen(fps);
 			fpsUpdateDelay = min(0.5f, sqrt(fpsElapsed / framesDrawn));
 			fpsElapsed = 0;
