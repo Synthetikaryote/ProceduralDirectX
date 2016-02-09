@@ -25,7 +25,8 @@ struct LightingBufferType {
 };
 struct BrushBufferType {
 	XMFLOAT4 cursorPosition;
-	float cursorRadius;
+	unsigned cursorFlags;
+	float cursorRadiusSq;
 	float cursorLineThickness;
 };
 

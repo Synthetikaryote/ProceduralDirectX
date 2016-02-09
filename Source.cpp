@@ -360,17 +360,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(30, 30);
+	Mesh* worldMesh = Mesh::LoadSphere(1000, 1000);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
-	//Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
+	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
 	Texture* specularTexture = Texture::Load(string("8081-earthspec4k.jpg"));
 	Texture* normalTexture = Texture::Load(string("8081-earthnormal4k.jpg"));
-	//TextureBinding heightBinding = { heightTexture, ShaderTypeVertex, 0 };
+	TextureBinding heightBinding = { heightTexture, ShaderTypeVertex, 0 };
 	TextureBinding diffuseBinding = { diffuseTexture, ShaderTypePixel, diffuseTexture->isTextureCube ? 1 : 0 };
 	TextureBinding specularBinding = { specularTexture, ShaderTypePixel, 2 };
 	TextureBinding normalBinding = { normalTexture, ShaderTypePixel, 3 };
-	worldMesh->textureBindings = { /*heightBinding, */diffuseBinding, specularBinding, normalBinding };
+	worldMesh->textureBindings = { heightBinding, diffuseBinding, specularBinding, normalBinding };
 	worldMesh->shader = litTexture;
 	world->meshes.push_back(worldMesh);
 
@@ -432,6 +432,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	UINT32 fpsLength = 0;
 	wchar_t fps[255];
 	wchar_t message[255];
+	swprintf_s(message, L"");
 	while (true) {
 		// Check to see if any messages are waiting in the queue
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -469,10 +470,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		if (FAILED(result) && (result == DIERR_INPUTLOST) || (result == DIERR_NOTACQUIRED))
 			mouse->Acquire();
 		POINT windowMousePos;
-		GetCursorPos(&windowMousePos);
-		ScreenToClient(Uber::I().hWnd, &windowMousePos);
-		Uber::I().mouseX = windowMousePos.x;
-		Uber::I().mouseY = windowMousePos.y;
+		if (Uber::I().cursorVisible) {
+			GetCursorPos(&windowMousePos);
+			ScreenToClient(Uber::I().hWnd, &windowMousePos);
+			Uber::I().mouseX = windowMousePos.x;
+			Uber::I().mouseY = windowMousePos.y;
+		}
 
 		// update the camera
 		Uber::I().camera->Update(elapsed);
@@ -515,7 +518,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		XMFLOAT3 dotResult, lenResult;
 		XMStoreFloat3(&dotResult, XMVector3Dot(dir, delta));
 		XMStoreFloat3(&lenResult, XMVector3LengthSq(delta));
-		bool intersection = false;
 		float underSqrt = dotResult.x * dotResult.x - lenResult.x + 1.0f;
 		XMFLOAT4 cursorPosition = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 		if (underSqrt >= 0) {
@@ -523,7 +525,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			float sqrtResult = sqrtf(underSqrt);
 			float dist = -dotResult.x - sqrtResult;
 			XMStoreFloat4(&cursorPosition, XMVectorAdd(start, XMVectorScale(dir, dist)));
-			intersection = true;
+			float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
+			brushBuffer.data.cursorFlags = 1;
+			brushBuffer.data.cursorRadiusSq = ((0.01f + closeness) * 0.1f + 0.01f) * ((0.01f + closeness) * 0.1f + 0.01f);
+			swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadiusSq);
+			brushBuffer.data.cursorLineThickness = (1.0f - Uber::I().camera->focusLinearZoom) * 0.1f;
+			brushBuffer.data.cursorPosition = cursorPosition;
+			brushBuffer.UpdateSubresource();
+		}
+		else if (brushBuffer.data.cursorFlags & 1) {
+			brushBuffer.data.cursorFlags = 0;
+			brushBuffer.UpdateSubresource();
+			swprintf_s(message, L"");
 		}
 
 
@@ -581,13 +594,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					}
 				}
 				materialBuffer.UpdateSubresource();
-
-				brushBuffer.data.cursorPosition = cursorPosition;
-				float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
-				brushBuffer.data.cursorRadius = (0.01f + closeness) * 0.1f + 0.01f;
-				swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadius);
-				brushBuffer.data.cursorLineThickness = (1.0f - Uber::I().camera->focusLinearZoom) * 0.1f;
-				brushBuffer.UpdateSubresource();
 
 				mesh->Draw();
 			}

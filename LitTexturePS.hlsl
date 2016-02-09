@@ -21,7 +21,8 @@ cbuffer LightingBuffer : register(b1) {
 };
 cbuffer BrushBuffer : register(b2) {
     float4 cursorPosition;
-    float cursorRadius;
+    uint cursorFlags;
+    float cursorRadiusSq;
     float cursorLineThickness;
 }
 
@@ -78,9 +79,10 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
     float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
 
     // cursor
-    if (length(cursorPosition.xyz) > 0.0f) {
-        float len = length(input.worldPos.xyz - cursorPosition.xyz);
-        if (len < cursorRadius) {
+    if (cursorFlags) {
+        float3 dist = input.worldPos.xyz - cursorPosition.xyz;
+        float lenSq = dot(dist, dist);
+        if (lenSq < cursorRadiusSq) {
             diffuse *= 1.5f;
             ambient = 0.5f;
         }
