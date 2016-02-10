@@ -13,6 +13,7 @@ cbuffer MaterialBuffer : register(b1) {
     float4 materialSpecular;
     uint vsSlotsUsed;
     uint psSlotsUsed;
+	uint psFlags;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;

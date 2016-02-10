@@ -28,5 +28,5 @@ vector<uint8_t> Read(string path) {
 };
 
 bool IsKeyDown(unsigned char vk) {
-	return static_cast<bool>(Uber::I().keyboardState[vk] & 0x80);
+	return (Uber::I().keyboardState[vk] & 0x80) ? true : false;
 }

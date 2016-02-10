@@ -11,6 +11,7 @@ cbuffer MaterialBuffer : register(b0) {
     float4 materialSpecular;
     uint vsSlotsUsed;
     uint psSlotsUsed;
+	uint psFlags;
 };
 cbuffer LightingBuffer : register(b1) {
     float4 viewPosition;
@@ -70,13 +71,19 @@ float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
     }
 
     float d = saturate(dot(dirToLight, bumpNormal));
+	if (psFlags & 1) {
+		d = round(d * 3.0f) / 3.0f;
+	}
     float intensity = 1.0f;
     float4 diffuse = intensity * d * lightDiffuse * materialDiffuse;
 
     float3 reflected = reflect(-dirToLight, normal);
     float shininess = 3.0f;
     float s = pow(saturate(dot(reflected, dirToView)), shininess);
-    float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
+	if (psFlags & 1) {
+		s = round(s * 3.0f) / 3.0f;
+	}
+	float4 specular = saturate(intensity * lightSpecular * materialSpecular * s);
 
     // cursor
     if (cursorFlags) {

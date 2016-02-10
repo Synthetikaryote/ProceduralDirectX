@@ -66,10 +66,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	Uber::I().screenWidth = static_cast<unsigned>(GetSystemMetrics(SM_CXSCREEN));
 	Uber::I().screenHeight = static_cast<unsigned>(GetSystemMetrics(SM_CYSCREEN));
-	Uber::I().windowWidth = windowed ? Uber::I().screenWidth * 0.75f : Uber::I().screenWidth;
-	Uber::I().windowHeight = windowed ? Uber::I().screenHeight * 0.75f : Uber::I().screenHeight;
-	Uber::I().windowLeft = windowed ? (Uber::I().screenWidth - Uber::I().windowWidth) * 0.5f : 0.0f;
-	Uber::I().windowTop = windowed ? (Uber::I().screenHeight - Uber::I().windowHeight) * 0.5f : 0.0f;
+	Uber::I().windowWidth = windowed ? Uber::I().screenWidth * 2 / 4 : Uber::I().screenWidth;
+	Uber::I().windowHeight = windowed ? Uber::I().screenHeight * 2 / 4 : Uber::I().screenHeight;
+	Uber::I().windowLeft = windowed ? (Uber::I().screenWidth - Uber::I().windowWidth) / 2 : 0;
+	Uber::I().windowTop = windowed ? (Uber::I().screenHeight - Uber::I().windowHeight) / 2 : 0;
 	RECT wr = { 0, 0, Uber::I().windowWidth, Uber::I().windowHeight };    // set the size, but not the position
 	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);    // adjust the size
 
@@ -288,18 +288,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	d2dContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 	d2dContext->SetDpi(dpiX, dpiY);
 
-	// create the projection matrix
-	float fieldOfView = PI / 4.0f;
-	float screenAspect = static_cast<float>(Uber::I().windowWidth) / Uber::I().windowHeight;
-	float screenDepth = 1000.0f;
-	float screenNear = 0.00001f;
-	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, screenAspect, screenNear, screenDepth);
-
 	// create the world matrix
 	XMMATRIX worldMatrix = XMMatrixIdentity();
-
-	// create an orthographic projection matrix for 2D UI rendering.
-	XMMATRIX orthoMatrix = XMMatrixOrthographicLH(static_cast<float>(Uber::I().windowWidth), static_cast<float>(Uber::I().windowHeight), screenNear, screenDepth);
 
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
@@ -363,7 +353,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(1000, 1000);
+	Mesh* worldMesh = Mesh::LoadSphere(500, 250);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -386,7 +376,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->binds = { DIK_E, DIK_S, DIK_D, DIK_F, DIK_SPACE, DIK_LCONTROL };
 	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
 	Uber::I().camera->SetFocus(world);
-	XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 
 	// text
 	// create a white brush
@@ -401,7 +390,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// align top-left
 	ThrowIfFailed(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
 	ThrowIfFailed(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-
 
 	// input
 	// keyboard
@@ -419,11 +407,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ThrowIfFailed(mouse->SetCooperativeLevel(Uber::I().hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE));
 	mouse->Acquire();
 
-
 	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
-
-	XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
-	worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 
 
 	// main loop
@@ -482,66 +466,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 		// update the camera
 		Uber::I().camera->Update(elapsed);
+		XMMATRIX rotationMatrix = XMLoadFloat4x4(&Uber::I().camera->rot);
+		XMMATRIX viewMatrix = XMLoadFloat4x4(&Uber::I().camera->view);
+		XMMATRIX projectionMatrix = XMLoadFloat4x4(&Uber::I().camera->proj);
 
-		// generate the view matrix based on the camera
-		//XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
-		XMVECTOR lookAtVector = XMLoadFloat3(&Uber::I().camera->forward);
-		XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
-		XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(Uber::I().camera->pitch, Uber::I().camera->yaw, 0.f);
-		// rotate the forward and up according to the camera rotation
-		lookAtVector = XMVector3TransformCoord(lookAtVector, rotationMatrix);
-		upVector = XMVector3TransformCoord(upVector, rotationMatrix);
-		// move the forward vector to the target position
-		lookAtVector = XMVectorAdd(positionVector, lookAtVector);
-		// create the view matrix
-		XMMATRIX viewMatrix = XMMatrixLookAtLH(positionVector, lookAtVector, upVector);
-
-		// raycast the cursor position to find the spot on the model the camera is focusing on
-		// reference: http://richardssoftware.net/Home/Post/23
-		// put the mouse coords into -1, 1 space as the origin
-		float vx = (2.0f * Uber::I().mouseX / Uber::I().windowWidth - 1.0f) / XMVectorGetX(projectionMatrix.r[0]);
-		float vy = (-2.0f * Uber::I().mouseY / Uber::I().windowHeight + 1.0f) / XMVectorGetY(projectionMatrix.r[1]);
-		Transform& t = *world->transform;
-		XMVECTOR start = XMLoadFloat4(&XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
-		XMVECTOR end = XMLoadFloat4(&XMFLOAT4(vx, vy, 1.0f, 1.0f));
-		XMVECTOR dir = XMVectorSubtract(end, start);
-		XMMATRIX inverseView = XMMatrixInverse(nullptr, viewMatrix);
-		start = XMVector4Transform(start, inverseView);
-		end = XMVector4Transform(end, inverseView);
-		dir = XMVector4Transform(dir, inverseView);
-		dir = XMVector3Normalize(dir);
-		// find the intersection with the sphere
-		// reference: https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
-		// d = -(l . (o - c)) +- sqrt( (l . (o - c))^2 - (||o - c||^2 - r^2) )
-		// l = dir, o = start, c = center, r = 1
-		// if inside the sqrt is less than 0, there is no intersection
-		XMVECTOR center = XMLoadFloat4(&XMFLOAT4(t.x, t.y, t.z, 1.0f));
-		// delta = (o - c)
-		XMVECTOR delta = XMVectorSubtract(start, center);
-		XMFLOAT3 dotResult, lenResult;
-		XMStoreFloat3(&dotResult, XMVector3Dot(dir, delta));
-		XMStoreFloat3(&lenResult, XMVector3LengthSq(delta));
-		float underSqrt = dotResult.x * dotResult.x - lenResult.x + 1.0f;
-		XMFLOAT4 cursorPosition = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
-		if (underSqrt >= 0) {
-			// 2 intersections, but always take the closer one
-			float sqrtResult = sqrtf(underSqrt);
-			float dist = -dotResult.x - sqrtResult;
-			XMStoreFloat4(&cursorPosition, XMVectorAdd(start, XMVectorScale(dir, dist)));
+		RaycastResult rayResult = Uber::I().camera->ScreenRaycastToModelSphere(world);
+		if (rayResult.didHit) {
 			float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
 			brushBuffer.data.cursorFlags = 1;
 			brushBuffer.data.cursorRadiusSq = ((0.01f + closeness) * 0.1f + 0.01f) * ((0.01f + closeness) * 0.1f + 0.01f);
-			swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadiusSq);
+			//swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadiusSq);
 			brushBuffer.data.cursorLineThickness = (1.0f - Uber::I().camera->focusLinearZoom) * 0.1f;
-			brushBuffer.data.cursorPosition = cursorPosition;
+			brushBuffer.data.cursorPosition = rayResult.hitLocation;
 			brushBuffer.UpdateSubresource();
 		}
 		else if (brushBuffer.data.cursorFlags & 1) {
 			brushBuffer.data.cursorFlags = 0;
 			brushBuffer.UpdateSubresource();
-			swprintf_s(message, L"");
+			//swprintf_s(message, L"");
 		}
-
 
 		// update the constant buffers that are constant for all meshes
 		// shaders must receive transposed matrices in DirectX11
@@ -555,6 +498,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		lightingBuffer.data.lightDiffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		lightingBuffer.data.lightDirection = XMFLOAT4(0.70710678118f, 0.0f, 0.70710678118f, 0.0f);
 		lightingBuffer.data.lightSpecular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+		XMVECTOR positionVector = XMLoadFloat3(&Uber::I().camera->position);
 		XMStoreFloat4(&lightingBuffer.data.viewPosition, positionVector);
 		lightingBuffer.UpdateSubresource();
 
@@ -570,6 +514,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			for (auto* mesh : model->meshes) {
 				// add rotation to the sphere
 				if (Uber::I().camera->focus) {
+					XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+					XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 					worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				}
 				else {
@@ -596,6 +542,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							break;
 					}
 				}
+				materialBuffer.data.psFlags = PSFlags::CelShading;
 				materialBuffer.UpdateSubresource();
 
 				mesh->Draw();

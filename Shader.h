@@ -5,6 +5,10 @@
 #include <vector>
 class Texture;
 
+enum PSFlags {
+	CelShading = 1
+};
+
 using namespace std;
 
 class Shader : public Resource {
