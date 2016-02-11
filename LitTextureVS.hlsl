@@ -60,12 +60,13 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.
     float4 posWorld = mul(position, worldMatrix);
-    output.worldPos = posWorld;
     output.position = mul(posWorld, viewMatrix);
     output.position = mul(output.position, projectionMatrix);
 
 	// store the texture coordinates for the pixel shader
     output.normal = mul(input.normal, worldMatrix).xyz;
+	// use the normal since the raycast hits the base sphere anyway
+    output.worldPos = float4(output.normal, 1.0f);
 
     output.tangent = mul(input.tangent, worldMatrix).xyz;
     output.dirToLight = -lightDirection.xyz;
