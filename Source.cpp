@@ -410,6 +410,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
 
 	float raiseDir = 1.0f;
+	float flattenHeight = 0.0f;
+	bool flatten = false;
 
 	// main loop
 	MSG msg = { 0 };
@@ -445,10 +447,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		if (IsKeyDown(DIK_ESCAPE))
 			break;
 
-		if (IsKeyDown(DIK_1))
+		if (IsKeyDown(DIK_1)) {
 			raiseDir = 1.0f;
-		if (IsKeyDown(DIK_2))
+			flattenHeight = 0.0f;
+		}
+		else if (IsKeyDown(DIK_2)) {
 			raiseDir = -1.0f;
+			flattenHeight = 0.0f;
+		}
+		else if (IsKeyDown(DIK_3)) {
+			raiseDir = 0.0f;
+			flattenHeight = 0.0f;
+		}
 
 		// read the input
 		HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
@@ -492,7 +502,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				auto cVec = XMVector4Transform(XMLoadFloat4(&c), inverseWorld);
 				XMStoreFloat4(&c, cVec);
 				vector<Vertex*> affectedVertices;
-				float mostExtreme = raiseDir * 1000000.0f;
+				float mostExtremeMin = 1000000.0f;
+				float mostExtremeMax = -1000000.0f;
+				float totalHeight = 0.0f;
 				for (unsigned long i = 0; i < world->meshes[0]->vertexCount; ++i) {
 					auto& p = world->meshes[0]->vertices[i].position;
 					auto& n = world->meshes[0]->vertices[i].normal;
@@ -502,21 +514,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					if (d <= brushBuffer.data.cursorRadiusSq) {
 						affectedVertices.push_back(&world->meshes[0]->vertices[i]);
 						float vDistSq = p.x * p.x + p.y * p.y + p.z * p.z;
-						mostExtreme = raiseDir > 0 ? min(mostExtreme, vDistSq) : max(mostExtreme, vDistSq);
+						mostExtremeMin = min(mostExtremeMin, vDistSq);
+						mostExtremeMax = max(mostExtremeMax, vDistSq);
+						if (raiseDir == 0.0f && flattenHeight == 0.0f) {
+							totalHeight += sqrtf(vDistSq);
+						}
 					}
 				}
 				if (affectedVertices.size() > 0) {
-					float dist = 0.1f * elapsed * raiseDir;
+					float dist = 0.1f * elapsed;
+					if (raiseDir == 0.0f && flattenHeight == 0.0f)
+						flattenHeight = totalHeight / affectedVertices.size();
 					for (auto v : affectedVertices) {
 						auto& p = v->position;
 						auto& n = v->normal;
 						float vDistSq = p.x * p.x + p.y * p.y + p.z * p.z;
-						float ratio = raiseDir > 0 ? mostExtreme / vDistSq : vDistSq / mostExtreme;
-						float dist2 = dist * ratio * ratio;
-						p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
+						float diff = flattenHeight != 0.0f ? sqrt(vDistSq) - flattenHeight : 0.0f;
+						float raiseDir2 = raiseDir != 0.0f ? raiseDir : (diff > 0.0f ? -1.0f : 1.0f);
+						float ratio = raiseDir2 >= 0.0f ? mostExtremeMin / vDistSq : vDistSq / mostExtremeMax;
+						float dist2 = dist * raiseDir2 * ratio * ratio;
+						if (flattenHeight != 0.0f && abs(diff) < abs(dist2)) {
+							p.x = n.x * flattenHeight; p.y = n.y * flattenHeight; p.z = n.z * flattenHeight;
+						}
+						else {
+							p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
+						}
 					}
 					world->meshes[0]->CreateBuffers();
 				}
+			}
+			else {
+				flattenHeight = 0.0f;
 			}
 		}
 		else if (brushBuffer.data.cursorFlags & 1) {
