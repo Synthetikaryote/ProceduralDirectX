@@ -491,20 +491,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				auto& c = rayResult.hitLocation;
 				auto cVec = XMVector4Transform(XMLoadFloat4(&c), inverseWorld);
 				XMStoreFloat4(&c, cVec);
-				unsigned long vertsAffected = 0;
+				vector<Vertex*> affectedVertices;
+				float mostExtreme = raiseDir * 1000000.0f;
 				for (unsigned long i = 0; i < world->meshes[0]->vertexCount; ++i) {
-					auto& v = world->meshes[0]->vertices[i].position;
+					auto& p = world->meshes[0]->vertices[i].position;
 					auto& n = world->meshes[0]->vertices[i].normal;
 					// compare to the normal, which is the same as the unmodified positon
 					float dx = n.x - c.x, dy = n.y - c.y, dz = n.z - c.z;
 					float d = dx * dx + dy * dy + dz * dz;
-					float dist = 0.1f * elapsed * raiseDir;
 					if (d <= brushBuffer.data.cursorRadiusSq) {
-						v.x += n.x * dist; v.y += n.y * dist; v.z += n.z * dist;
-						++vertsAffected;
+						affectedVertices.push_back(&world->meshes[0]->vertices[i]);
+						float vDistSq = p.x * p.x + p.y * p.y + p.z * p.z;
+						mostExtreme = raiseDir > 0 ? min(mostExtreme, vDistSq) : max(mostExtreme, vDistSq);
 					}
 				}
-				world->meshes[0]->CreateBuffers();
+				if (affectedVertices.size() > 0) {
+					float dist = 0.1f * elapsed * raiseDir;
+					for (auto v : affectedVertices) {
+						auto& p = v->position;
+						auto& n = v->normal;
+						float vDistSq = p.x * p.x + p.y * p.y + p.z * p.z;
+						float ratio = raiseDir > 0 ? mostExtreme / vDistSq : vDistSq / mostExtreme;
+						float dist2 = dist * ratio * ratio;
+						p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
+					}
+					world->meshes[0]->CreateBuffers();
+				}
 			}
 		}
 		else if (brushBuffer.data.cursorFlags & 1) {
