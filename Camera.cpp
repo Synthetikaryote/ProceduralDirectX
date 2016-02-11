@@ -95,11 +95,6 @@ void Camera::Update(float elapsed) {
 				Uber::I().cursorVisible = true;
 				SetCursorPos(Uber::I().savedMousePos.x, Uber::I().savedMousePos.y);
 			}
-
-			// hold left click to use tool
-			if (Uber::I().mouseState.rgbButtons[0]) {
-
-			}
 		}
 
 		// update position

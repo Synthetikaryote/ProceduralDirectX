@@ -16,6 +16,7 @@ cbuffer LightingBuffer : register(b0) {
 };
 cbuffer PostProcessBuffer : register(b1) {
     float2 windowSize;
+	uint flags;
 }
 
 // http://stackoverflow.com/questions/5149544/can-i-generate-a-random-number-inside-a-pixel-shader
@@ -44,29 +45,32 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 	// edge detection
 	//float2 dx = ddx(input.tex).x;
 	//float2 dy = ddy(input.tex).y;
-	float deltaU = 1.0f / windowSize.x;
-	float deltaV = 1.0f / windowSize.y;
-	float2 offset[9] = {
-		float2(-deltaU, -deltaV),
-		float2(0.0f, -deltaV),
-		float2(deltaU, -deltaV),
-		float2(-deltaU, 0.0f),
-		float2(0.0f, 0.0f),
-		float2(deltaU, 0.0f),
-		float2(-deltaU, deltaV),
-		float2(0.0f, deltaV),
-		float2(deltaU, deltaV)
-	};
-	float kernelX[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
-	float kernelY[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
-	float3 valX = (float3)0;
-	float3 valY = (float3)0;
-	for (int i = 0; i < 9; ++i) {
-		float4 texColor = tex.Sample(SampleType, input.tex + offset[i]);
-		valX += kernelX[i] * texColor.xyz;
-		valY += kernelY[i] * texColor.xyz;
+
+	if (flags) {
+		float deltaU = 1.0f / windowSize.x;
+		float deltaV = 1.0f / windowSize.y;
+		float2 offset[9] = {
+			float2(-deltaU, -deltaV),
+			float2(0.0f, -deltaV),
+			float2(deltaU, -deltaV),
+			float2(-deltaU, 0.0f),
+			float2(0.0f, 0.0f),
+			float2(deltaU, 0.0f),
+			float2(-deltaU, deltaV),
+			float2(0.0f, deltaV),
+			float2(deltaU, deltaV)
+		};
+		float kernelX[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+		float kernelY[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+		float3 valX = (float3)0;
+			float3 valY = (float3)0;
+			for (int i = 0; i < 9; ++i) {
+				float4 texColor = tex.Sample(SampleType, input.tex + offset[i]);
+					valX += kernelX[i] * texColor.xyz;
+				valY += kernelY[i] * texColor.xyz;
+			}
+		color *= (length((valX * valX) + (valY * valY)) > 0.5f) ? 0.0f : 1.0f;
 	}
-	color *= (length((valX * valX) + (valY * valY)) > 0.5f) ? 0.0f : 1.0f;
 
     return color;
 }

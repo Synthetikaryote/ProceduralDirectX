@@ -32,6 +32,7 @@ struct BrushBufferType {
 };
 struct PostProcessBufferType {
 	XMFLOAT2 windowSize;
+	unsigned flags;
 };
 
 template <typename T>

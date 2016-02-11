@@ -143,6 +143,9 @@ void Mesh::CreateBuffers() {
 	assert(vertices);
 	assert(indices);
 
+	if (vertexBuffer) vertexBuffer->Release();
+	if (indexBuffer) indexBuffer->Release();
+
 	D3D11_BUFFER_DESC vertexDesc = { sizeof(Vertex) * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u };
 	D3D11_SUBRESOURCE_DATA vertexData = { vertices, 0u, 0u };
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &vertexBuffer));

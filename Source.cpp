@@ -66,8 +66,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	Uber::I().screenWidth = static_cast<unsigned>(GetSystemMetrics(SM_CXSCREEN));
 	Uber::I().screenHeight = static_cast<unsigned>(GetSystemMetrics(SM_CYSCREEN));
-	Uber::I().windowWidth = windowed ? Uber::I().screenWidth * 2 / 4 : Uber::I().screenWidth;
-	Uber::I().windowHeight = windowed ? Uber::I().screenHeight * 2 / 4 : Uber::I().screenHeight;
+	Uber::I().windowWidth = windowed ? Uber::I().screenWidth * 3 / 4 : Uber::I().screenWidth;
+	Uber::I().windowHeight = windowed ? Uber::I().screenHeight * 3 / 4 : Uber::I().screenHeight;
 	Uber::I().windowLeft = windowed ? (Uber::I().screenWidth - Uber::I().windowWidth) / 2 : 0;
 	Uber::I().windowTop = windowed ? (Uber::I().screenHeight - Uber::I().windowHeight) / 2 : 0;
 	RECT wr = { 0, 0, Uber::I().windowWidth, Uber::I().windowHeight };    // set the size, but not the position
@@ -409,6 +409,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
 
+	float raiseDir = 1.0f;
 
 	// main loop
 	MSG msg = { 0 };
@@ -445,9 +446,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			break;
 
 		if (IsKeyDown(DIK_1))
-			Uber::I().camera->SetFocus(world);
+			raiseDir = 1.0f;
 		if (IsKeyDown(DIK_2))
-			Uber::I().camera->SetFocus(nullptr);
+			raiseDir = -1.0f;
 
 		// read the input
 		HRESULT result = keyboard->GetDeviceState(sizeof(Uber::I().keyboardState), (LPVOID)&Uber::I().keyboardState);
@@ -475,10 +476,36 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
 			brushBuffer.data.cursorFlags = 1;
 			brushBuffer.data.cursorRadiusSq = ((0.01f + closeness) * 0.1f + 0.01f) * ((0.01f + closeness) * 0.1f + 0.01f);
-			//swprintf_s(message, L"cursorRadius: %.8f", brushBuffer.data.cursorRadiusSq);
+			//swprintf_s(message, L"hitLocation: %.2f,%.2f,%.2f", rayResult.hitLocation.x, rayResult.hitLocation.y, rayResult.hitLocation.z);
 			brushBuffer.data.cursorLineThickness = (1.0f - Uber::I().camera->focusLinearZoom) * 0.1f;
 			brushBuffer.data.cursorPosition = rayResult.hitLocation;
 			brushBuffer.UpdateSubresource();
+
+			// hold left click to use tool
+			if (Uber::I().mouseState.rgbButtons[0]) {
+				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
+				XMMATRIX worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
+				XMMATRIX inverseWorld = XMMatrixInverse(nullptr, worldMatrix);
+				// bring the raycast location back to model space
+				auto& c = rayResult.hitLocation;
+				auto cVec = XMVector4Transform(XMLoadFloat4(&c), inverseWorld);
+				XMStoreFloat4(&c, cVec);
+				unsigned long vertsAffected = 0;
+				for (unsigned long i = 0; i < world->meshes[0]->vertexCount; ++i) {
+					auto& v = world->meshes[0]->vertices[i].position;
+					auto& n = world->meshes[0]->vertices[i].normal;
+					// compare to the normal, which is the same as the unmodified positon
+					float dx = n.x - c.x, dy = n.y - c.y, dz = n.z - c.z;
+					float d = dx * dx + dy * dy + dz * dz;
+					float dist = 0.1f * elapsed * raiseDir;
+					if (d <= brushBuffer.data.cursorRadiusSq) {
+						v.x += n.x * dist; v.y += n.y * dist; v.z += n.z * dist;
+						++vertsAffected;
+					}
+				}
+				world->meshes[0]->CreateBuffers();
+			}
 		}
 		else if (brushBuffer.data.cursorFlags & 1) {
 			brushBuffer.data.cursorFlags = 0;
@@ -542,7 +569,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							break;
 					}
 				}
-				materialBuffer.data.psFlags = PSFlags::CelShading;
+				//materialBuffer.data.psFlags = PSFlags::CelShading;
 				materialBuffer.UpdateSubresource();
 
 				mesh->Draw();
