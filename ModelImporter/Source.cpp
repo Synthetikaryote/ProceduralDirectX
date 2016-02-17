@@ -11,6 +11,7 @@ using namespace std;
 struct Vertex {
 	XMFLOAT4 position;
 	XMFLOAT4 normal;
+	XMFLOAT4 tangent;
 	XMFLOAT3 texture;
 };
 
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
 				for (unsigned j = 0; j < aiMesh->mNumVertices; ++j) {
 					verts[j].position = XMFLOAT4(aiMesh->mVertices[j].x * scale, aiMesh->mVertices[j].y * scale, aiMesh->mVertices[j].z * scale, 1.f);
 					verts[j].normal = XMFLOAT4(aiMesh->mNormals[j].x, aiMesh->mNormals[j].y, aiMesh->mNormals[j].z, 0.f);
+					verts[j].normal = XMFLOAT4(aiMesh->mTangents[j].x, aiMesh->mTangents[j].y, aiMesh->mTangents[j].z, 0.f);
 					verts[j].texture = XMFLOAT3(aiMesh->mTextureCoords[0][j].x, aiMesh->mTextureCoords[0][j].y, aiMesh->mTextureCoords[0][j].z);
 				}
 				unsigned index = 0;

@@ -34,9 +34,17 @@ void Mesh::Release() {
 	Resource::Release();
 }
 
+void Mesh::DrawDepthMap() {
+	DrawWithBindings(depthMapTextureBindings);
+}
+
 void Mesh::Draw() {
+	DrawWithBindings(textureBindings);
+}
+
+void Mesh::DrawWithBindings(vector<TextureBinding>& bindings) {
 	// give the pixel shader the textures
-	for (auto& binding : textureBindings) {
+	for (auto& binding : bindings) {
 		switch (binding.shaderType) {
 			case ShaderTypeVertex:
 				Uber::I().context->VSSetShaderResources(binding.shaderSlot, 1, &binding.texture->shaderResourceView);

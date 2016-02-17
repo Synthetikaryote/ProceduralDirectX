@@ -39,7 +39,7 @@ struct VertexShaderOutput {
 };
 
 // pixel shader
-float4 PixelShaderFunction(VertexShaderOutput input) : SV_TARGET {
+float4 main(VertexShaderOutput input) : SV_TARGET {
     float4 ambient = saturate(lightAmbient * materialAmbient);
 
 	// diffuse

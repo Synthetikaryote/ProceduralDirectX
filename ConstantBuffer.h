@@ -34,6 +34,11 @@ struct PostProcessBufferType {
 	XMFLOAT2 windowSize;
 	unsigned flags;
 };
+struct DepthMapBufferType {
+	XMMATRIX worldViewProj;
+	unsigned vsSlotsUsed;
+	unsigned psSlotsUsed;
+};
 
 template <typename T>
 class ConstantBuffer {

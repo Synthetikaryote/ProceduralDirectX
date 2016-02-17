@@ -40,15 +40,19 @@ Shader* Shader::LoadShader(string vertexCompiledPath, string pixelCompiledPath, 
 	size_t key = hash<string>()(string(keyString));
 	return Uber::I().resourceManager->Load<Shader>(key, [&vertexCompiledPath, &pixelCompiledPath, &vertexInputDesc, &samplerDesc] {
 		Shader* s = new Shader();
-		auto vsBytecode = Read(vertexCompiledPath);
 		ComPtr<ID3D11Device>& device = Uber::I().device;
-		ThrowIfFailed(Uber::I().device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &s->vertexShader));
 
-		auto psBytecode = Read(pixelCompiledPath);
-		ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &s->pixelShader));
+		if (vertexCompiledPath.size() > 0) {
+			auto vsBytecode = Read(vertexCompiledPath);
+			ThrowIfFailed(Uber::I().device->CreateVertexShader(&vsBytecode[0], vsBytecode.size(), nullptr, &s->vertexShader));
+			// this needs to match the vertex shader's input data structure
+			ThrowIfFailed(device->CreateInputLayout(&vertexInputDesc[0], vertexInputDesc.size(), &vsBytecode[0], vsBytecode.size(), &s->inputLayout));
+		}
 
-		// this needs to match the vertex shader's input data structure
-		ThrowIfFailed(device->CreateInputLayout(&vertexInputDesc[0], vertexInputDesc.size(), &vsBytecode[0], vsBytecode.size(), &s->inputLayout));
+		if (pixelCompiledPath.size() > 0) {
+			auto psBytecode = Read(pixelCompiledPath);
+			ThrowIfFailed(device->CreatePixelShader(&psBytecode[0], psBytecode.size(), nullptr, &s->pixelShader));
+		}
 
 		ThrowIfFailed(device->CreateSamplerState(&samplerDesc, &s->samplerState));
 

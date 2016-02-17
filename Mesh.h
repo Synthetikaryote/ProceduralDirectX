@@ -45,11 +45,14 @@ public:
 	ID3D11Buffer* indexBuffer = nullptr;
 	vector<TextureBinding> textureBindings;
 	Shader* shader = nullptr;
+	vector<TextureBinding> depthMapTextureBindings;
 
 	Mesh();
 	~Mesh();
 	void Release() override;
 	void Draw();
+	void DrawDepthMap();
+	void DrawWithBindings(vector<TextureBinding>& bindings);
 
 	static Mesh* LoadQuad();
 	static Mesh* LoadPlane(unsigned columns = 1, unsigned rows = 1);

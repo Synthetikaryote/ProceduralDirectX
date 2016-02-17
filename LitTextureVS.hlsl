@@ -41,7 +41,7 @@ struct VertexShaderOutput {
 };
 
 // vertex shader
-VertexShaderOutput VertexShaderFunction(VertexShaderInput input) {
+VertexShaderOutput main(VertexShaderInput input) {
     VertexShaderOutput output;
 
 	// Change the position vector to be 4 units for proper matrix calculations.

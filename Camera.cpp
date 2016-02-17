@@ -3,7 +3,7 @@
 #include "Model.h"
 #include "Transform.h"
 
-Camera::Camera() {
+Camera::Camera(float fieldOfView, float aspect, float nearPlane, float farPlane) {
 	position = { 0.f, 0.f, -3.f };
 	rotation = { 0.f, 0.f, 0.f };
 	up = { 0.f, 1.f, 0.f };
@@ -19,11 +19,7 @@ Camera::Camera() {
 	focus = nullptr;
 
 	// create the projection matrix
-	float fieldOfView = PI / 4.0f;
-	float screenAspect = static_cast<float>(Uber::I().windowWidth) / Uber::I().windowHeight;
-	float screenDepth = 1000.0f;
-	float screenNear = 0.00001f;
-	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, screenAspect, screenNear, screenDepth);
+	XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(fieldOfView, aspect, nearPlane, farPlane);
 	XMStoreFloat4x4(&proj, projectionMatrix);
 
 	// create an orthographic projection matrix for 2D UI rendering.
@@ -47,12 +43,13 @@ void Camera::SetFocus(Model* focus) {
 		position = XMFLOAT3(0.0f, 0.0f, -focusDist);
 		yaw = 0.0f;
 		pitch = 0.0f;
-		yawPitchPosDirty = true;
 	}
 	else {
 		//yaw = TWOPI - (focusYaw + PI);
 	}
 	this->focus = focus;
+
+	UpdateState();
 }
 
 void Camera::Update(float elapsed) {

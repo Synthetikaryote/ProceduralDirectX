@@ -14,7 +14,7 @@ struct RaycastResult {
 
 class Camera {
 public:
-	Camera();
+	Camera(float fieldOfView, float aspect, float nearPlane, float farPlane);
 	~Camera();
 
 	XMFLOAT3 position, rotation, up, forward, velocity;

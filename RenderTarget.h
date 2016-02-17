@@ -4,7 +4,7 @@ class RenderTarget
 {
 public:
 	RenderTarget();
-	RenderTarget(unsigned width, unsigned height, DXGI_FORMAT format);
+	RenderTarget(unsigned width, unsigned height, DXGI_FORMAT colorFormat, DXGI_FORMAT depthFormat, unsigned bindFlags);
 	~RenderTarget();
 
 	void BeginRender();
