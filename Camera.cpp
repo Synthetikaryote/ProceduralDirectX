@@ -52,9 +52,10 @@ void Camera::SetFocus(Model* focus) {
 	UpdateState();
 }
 
-void Camera::Update(float elapsed) {
-	if (Uber::I().windowIsFocused) {
+bool Camera::Update(float elapsed) {
+	bool cameraChanged = false;
 
+	if (Uber::I().windowIsFocused) {
 		// zoom
 		focusLinearZoom = max(-10.0f, min(10.0f, focusLinearZoom + sensitivity.z * -Uber::I().mouseState.lZ));
 		float boundingRadius = 1.0f; // to do
@@ -77,8 +78,13 @@ void Camera::Update(float elapsed) {
 			}
 
 			if (focus) {
-				focusYaw = fmodf(focusYaw + sensitivity.x * zoomFactor * Uber::I().mouseState.lX, TWOPI);
-				focusPitch = max(-HALFPI, min(fmodf(focusPitch + sensitivity.y * zoomFactor * -Uber::I().mouseState.lY, TWOPI), HALFPI));
+				float newFocusYaw = fmodf(focusYaw + sensitivity.x * zoomFactor * Uber::I().mouseState.lX, TWOPI);
+				float newFocusPitch = max(-HALFPI, min(fmodf(focusPitch + sensitivity.y * zoomFactor * -Uber::I().mouseState.lY, TWOPI), HALFPI));
+				if (newFocusYaw != focusYaw || newFocusPitch != focusPitch) {
+					cameraChanged = true;
+					focusYaw = newFocusYaw;
+					focusPitch = newFocusPitch;
+				}
 			}
 			else {
 				yaw = fmodf(yaw + sensitivity.x * Uber::I().mouseState.lX, TWOPI);
@@ -125,9 +131,11 @@ void Camera::Update(float elapsed) {
 			}
 		}
 		// if the camera's position or rotation changed, regenerate the view matrix
+		cameraChanged |= yawPitchPosDirty;
 		if (yawPitchPosDirty)
 			UpdateState();
 	}
+	return cameraChanged;
 }
 
 void Camera::UpdateState() {
@@ -146,12 +154,12 @@ void Camera::UpdateState() {
 	yawPitchPosDirty = false;
 }
 
-RaycastResult Camera::ScreenRaycastToModelSphere(Model* model) {
+RaycastResult Camera::ScreenRaycastToModelSphere(Model* model, int x, int y) {
 	// raycast the cursor position to find the spot on the model the camera is focusing on
 	// reference: http://richardssoftware.net/Home/Post/23
 	// put the mouse coords into -1, 1 space as the origin
-	float vx = (2.0f * Uber::I().mouseX / Uber::I().windowWidth - 1.0f) / proj._11;
-	float vy = (-2.0f * Uber::I().mouseY / Uber::I().windowHeight + 1.0f) / proj._22;
+	float vx = (2.0f * x / Uber::I().windowWidth - 1.0f) / proj._11;
+	float vy = (-2.0f * y / Uber::I().windowHeight + 1.0f) / proj._22;
 	Transform& t = *model->transform;
 	XMVECTOR start = XMLoadFloat4(&XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f));
 	XMVECTOR end = XMLoadFloat4(&XMFLOAT4(vx, vy, 1.0f, 1.0f));

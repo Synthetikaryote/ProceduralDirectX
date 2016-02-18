@@ -361,7 +361,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadSphere(500, 250);
+	Mesh* worldMesh = Mesh::LoadPartialSphere(24, 24, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -516,12 +516,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 
 		// update the camera
-		Uber::I().camera->Update(elapsed);
+		bool cameraChanged = Uber::I().camera->Update(elapsed);
 		//XMMATRIX rotationMatrix = XMLoadFloat4x4(&Uber::I().camera->rot);
 		XMMATRIX viewMatrix = XMLoadFloat4x4(&Uber::I().camera->view);
 		XMMATRIX projectionMatrix = XMLoadFloat4x4(&Uber::I().camera->proj);
 
-		RaycastResult rayResult = Uber::I().camera->ScreenRaycastToModelSphere(world);
+		if (cameraChanged) {
+			RaycastResult topLeft = Uber::I().camera->ScreenRaycastToModelSphere(world, 0, 0);
+			RaycastResult bottomRight = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth), static_cast<int>(Uber::I().windowHeight));
+			if (topLeft.didHit && bottomRight.didHit) {
+				auto& tl = topLeft.hitLocation, br = bottomRight.hitLocation;
+				float yawMin = atan2(tl.z, tl.x);
+				float yawMax = atan2(br.z, br.x);
+				float pitchMin = atan2(tl.z, sqrtf(tl.x * tl.x + tl.y * tl.y));
+				float pitchMax = atan2(br.z, sqrtf(br.x * br.x + br.y * br.y));
+				worldMesh->UpdatePartialSphere(24, 24, yawMin, yawMax, pitchMin, pitchMax);
+			}
+			else {
+
+			}
+		}
+
+		RaycastResult rayResult = Uber::I().camera->ScreenRaycastToModelSphere(world, Uber::I().mouseX, Uber::I().mouseY);
 		if (rayResult.didHit) {
 			float closeness = powf(Uber::I().camera->zoomBase, Uber::I().camera->focusLinearZoom);
 			brushBuffer.data.cursorFlags = 1;

@@ -35,8 +35,8 @@ public:
 	XMFLOAT4X4 view;
 	XMFLOAT4X4 proj;
 
-	void Update(float elapsed);
-	RaycastResult ScreenRaycastToModelSphere(Model* model);
+	bool Update(float elapsed);
+	RaycastResult ScreenRaycastToModelSphere(Model* model, int x, int y);
 	void UpdateState();
 };
 

@@ -3,6 +3,7 @@
 #include <directxmath.h>
 #include <d3d11_2.h>
 #include <vector>
+#include "Uber.h"
 class Texture;
 class Shader;
 using namespace DirectX;
@@ -53,11 +54,13 @@ public:
 	void Draw();
 	void DrawDepthMap();
 	void DrawWithBindings(vector<TextureBinding>& bindings);
+	void UpdatePartialSphere(unsigned longitudes = 24, unsigned latitudes = 24, float yawMin = 0.0f, float yawMax = TWOPI, float pitchMin = 0.0f, float pitchMax = PI);
 
 	static Mesh* LoadQuad();
 	static Mesh* LoadPlane(unsigned columns = 1, unsigned rows = 1);
 	static Mesh* LoadCubeSphere(unsigned gridSize = 10);
 	static Mesh* LoadSphere(unsigned longitudes = 24, unsigned latitudes = 24);
+	static Mesh* LoadPartialSphere(unsigned longitudes = 24, unsigned latitudes = 24, float yawMin = 0.0f, float yawMax = TWOPI, float pitchMin = 0.0f, float pitchMax = PI);
 	static Mesh* LoadRecursiveHemisphere(unsigned gridSize = 4, unsigned iterations = 3);
 	static Mesh* LoadFromFile(string path);
 	void CreateBuffers();

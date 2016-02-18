@@ -10,7 +10,7 @@ using namespace std;
 
 Mesh* GeneratePlane(unsigned columns, unsigned rows);
 Mesh* GenerateCubeSphere(unsigned gridSize);
-Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes);
+Mesh* GeneratePartialSphereNoBuffers(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax);
 Mesh* GenerateRecursiveHemisphere(unsigned gridSize, unsigned iterations);
 
 Mesh::Mesh() {
@@ -83,14 +83,36 @@ Mesh* Mesh::LoadPlane(unsigned columns, unsigned rows) {
 	});
 }
 
+
 Mesh* Mesh::LoadSphere(unsigned longitudes, unsigned latitudes) {
-	char keyString[40];
-	sprintf_s(keyString, "MeshSphere%u,%u", longitudes, latitudes);
+	return LoadPartialSphere(longitudes, latitudes, 0.0f, TWOPI, 0.0f, PI);
+}
+
+Mesh* Mesh::LoadPartialSphere(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
+	char keyString[255];
+	sprintf_s(keyString, "MeshPartialSphere%u,%u,%f,%f,%f,%f", longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
 	size_t key = hash<string>()(string(keyString));
 
-	return Uber::I().resourceManager->Load<Mesh>(key, [longitudes, latitudes] {
-		return GenerateSphere(longitudes, latitudes);
+	return Uber::I().resourceManager->Load<Mesh>(key, [longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax] {
+		Mesh* mesh = GeneratePartialSphereNoBuffers(longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
+		mesh->CreateBuffers();
+		return mesh;
 	});
+}
+
+void Mesh::UpdatePartialSphere(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
+	//Mesh* mesh = GeneratePartialSphereNoBuffers(longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
+	//vertexCount = mesh->vertexCount;
+	//indexCount = mesh->indexCount;
+	//delete[] vertices;
+	//delete[] indices;
+	//vertices = mesh->vertices;
+	//indices = mesh->indices;
+	//D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
+	//Uber::I().context->UpdateSubresource(vertexBuffer, 0, nullptr, &vertexData, sizeof(Vertex) * vertexCount, 0u);
+	//D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
+	//Uber::I().context->UpdateSubresource(indexBuffer, 0, nullptr, &indexData, sizeof(unsigned long) * indexCount, 0u);
+	//delete mesh;
 }
 
 Mesh* Mesh::LoadCubeSphere(unsigned gridSize) {
@@ -217,36 +239,37 @@ Mesh* GeneratePlane(unsigned columns, unsigned rows) {
 	return mesh;
 }
 
-// make a sphere
-Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes) {
+// make a part of a sphere within the yaw and pitch ranges
+Mesh* GeneratePartialSphereNoBuffers(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
 	Mesh* mesh = new Mesh();
 	mesh->vertexCount = latitudes * (longitudes + 1);
-	mesh->indexCount = (latitudes - 2) * (longitudes + 1) * 2 * 3;
+	float skippedRows = (pitchMin == 0.0f ? 0.5f : 0.0f) + (pitchMax == PI ? 0.5f : 0.0f);
+	mesh->indexCount = (latitudes - 1.0f - skippedRows) * (longitudes + 1) * 2 * 3;
 	mesh->vertices = new Vertex[mesh->vertexCount];
 	mesh->indices = new unsigned long[mesh->indexCount];
-	const float latStep = PI / (latitudes - 1);
-	const float lonStep = TWOPI / longitudes;
+	const float latStep = (pitchMax - pitchMin) / (latitudes - 1);
+	const float lonStep = (yawMax - yawMin) / longitudes;
 	unsigned long v = 0;
 	for (unsigned lat = 0; lat < latitudes; ++lat) {
 		for (unsigned lon = 0; lon <= longitudes; ++lon) {
-			const float alat = lat * latStep;
-			const float alon = lon * lonStep;
+			const float alat = pitchMin + lat * latStep;
+			const float alon = yawMin + lon * lonStep;
 			mesh->vertices[v].position = XMFLOAT4(sinf(alat) * cosf(alon), cosf(alat), sinf(alat) * sinf(alon), 1.0f);
 			mesh->vertices[v].normal = mesh->vertices[v].position;
 			mesh->vertices[v].normal.w = 0.0f;
 			mesh->vertices[v].tangent = XMFLOAT4(sinf(alat) * cosf(alon + lonStep) - sinf(alat) * cosf(alon), 0.0f, sinf(alat) * sinf(alon + lonStep) - sinf(alat) * sinf(alon), 0.0f);
-			mesh->vertices[v++].texture = XMFLOAT3(static_cast<float>(lon) / longitudes, -cos(alat) * 0.5f + 0.5f, 0.0f);
+			mesh->vertices[v++].texture = XMFLOAT3(alon / TWOPI, alat / PI, 0.0f);
 		}
 	}
 	unsigned index = 0;
 	for (unsigned lat = 0; lat < latitudes - 1; ++lat) {
 		for (unsigned lon = 0; lon < longitudes; ++lon) {
-			if (lat != latitudes - 2) {
+			if (lat != latitudes - 2 || pitchMax != PI) {
 				mesh->indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
 				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
 				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + (lon % (longitudes + 1));
 			}
-			if (lat != 0) {
+			if (lat != 0 || pitchMin != 0.0f) {
 				mesh->indices[index++] = lat * (longitudes + 1) + (lon % (longitudes + 1));
 				mesh->indices[index++] = lat * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
 				mesh->indices[index++] = (lat + 1) * (longitudes + 1) + ((lon + 1) % (longitudes + 1));
@@ -254,11 +277,9 @@ Mesh* GenerateSphere(unsigned longitudes, unsigned latitudes) {
 		}
 	}
 
-	// create the vertex and index buffers
-	mesh->CreateBuffers();
-
 	return mesh;
 }
+
 
 // (quadrilateralized spherical cube)
 Mesh* GenerateCubeSphere(unsigned gridSize) {
