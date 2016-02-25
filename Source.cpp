@@ -363,7 +363,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadPartialSphere(24, 24, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f, D3D11_CPU_ACCESS_WRITE);
+	Mesh* worldMesh = Mesh::LoadPartialSphere(128, 64, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f, D3D11_CPU_ACCESS_WRITE);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -525,29 +525,42 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 		if (cameraChanged) {
 			RaycastResult topLeft = Uber::I().camera->ScreenRaycastToModelSphere(world, 0, 0);
+			RaycastResult topRight = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth), 0);
+			RaycastResult topMiddle = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth) / 2, 0);
+			RaycastResult bottomLeft = Uber::I().camera->ScreenRaycastToModelSphere(world, 0, static_cast<int>(Uber::I().windowHeight));
 			RaycastResult bottomRight = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth), static_cast<int>(Uber::I().windowHeight));
-			if (topLeft.didHit && bottomRight.didHit) {
-				auto& tl = topLeft.hitLocation, br = bottomRight.hitLocation;
+			RaycastResult bottomMiddle = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth) / 2, static_cast<int>(Uber::I().windowHeight));
+			if (topLeft.didHit && topMiddle.didHit && topRight.didHit && bottomLeft.didHit && bottomMiddle.didHit && bottomRight.didHit) {
+				auto& tl = topLeft.hitLocation, tm = topMiddle.hitLocation, tr = topRight.hitLocation, bl = bottomLeft.hitLocation, bm = bottomMiddle.hitLocation, br = bottomRight.hitLocation;
 				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
 				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 				XMMATRIX worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				XMMATRIX inverseWorld = XMMatrixInverse(nullptr, worldMatrix);
 				// bring the raycast locations back to model space
-				auto tlVec = XMVector4Transform(XMLoadFloat4(&tl), inverseWorld);
-				XMStoreFloat4(&tl, tlVec);
-				auto brVec = XMVector4Transform(XMLoadFloat4(&br), inverseWorld);
-				XMStoreFloat4(&br, brVec);
-				float yawMin = atan2(tl.z, tl.x);
+				for (auto* v : {&tl, &tm, &tr, &bl, &bm, &br})
+					XMStoreFloat4(v, XMVector4Transform(XMLoadFloat4(v), inverseWorld));
+				float yawMin = min(atan2(tl.z, tl.x), atan2(bl.z, bl.x));
 				if (yawMin < 0.0f) yawMin += TWOPI;
-				float yawMax = atan2(br.z, br.x);
-				if (yawMax < yawMin) yawMax += TWOPI;
-				float pitchMin = atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI;
-				float pitchMax = atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI;
-				worldMesh->UpdatePartialSphere(24, 24, yawMin, yawMax, pitchMin, pitchMax);
+				float yawMax = max(atan2(br.z, br.x), atan2(tr.z, tr.x));
+				if (yawMax < 0.0f) yawMax += TWOPI;
+				float pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
+					atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
+					atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);
+				float pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
+					atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
+					atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
+				// round the bounds to the nearest grid point
+				float gridX = 128.0f; //diffuseTexture->w;
+				float gridY = 64.0f; //diffuseTexture->h;
+				yawMin = floor(yawMin * gridX) / gridX;
+				yawMax = ceil(yawMax * gridX) / gridX;
+				pitchMin = floor(pitchMin * gridY) / gridY;
+				pitchMax = ceil(pitchMax * gridY) / gridY;
+				worldMesh->UpdatePartialSphere(64, 32, yawMin, yawMax, pitchMin, pitchMax);
 				swprintf_s(message, L"yaw: %.4f-%.4f  pitch: %.4f-%.4f", yawMin, yawMax, pitchMin, pitchMax);
 			}
 			else {
-				worldMesh->UpdatePartialSphere(24, 24, 0.0f, TWOPI, 0.0f, PI);
+				worldMesh->UpdatePartialSphere(64, 32, 0.0f, TWOPI, 0.0f, PI);
 				swprintf_s(message, L"full sphere");
 			}
 		}
@@ -611,7 +624,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
 						}
 					}
-					world->meshes[0]->CreateBuffers();
+					world->meshes[0]->CreateBuffers(D3D11_CPU_ACCESS_WRITE);
 				}
 			}
 			else {
@@ -681,7 +694,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				//worldMatrix = XMMatrixIdentity();
 				auto& scaleVector = XMLoadFloat4(&XMFLOAT4(t.scaleX, t.scaleY, t.scaleZ, 0.0f));
 				auto& translationVector = XMLoadFloat4(&XMFLOAT4(t.x, t.y, t.z, 1.0f));
-				auto& rotationVector = XMLoadFloat4(&XMFLOAT4(t.pitch, t.yaw, t.roll, 0.0f));
+				// align the rotation to the grid
+				float gridX = 128.0f; // diffuseTexture->w;
+				float gridY = 64.0f; // diffuseTexture->h;
+				float yaw = floor(t.yaw * gridX) / gridX;
+				float pitch = floor(t.pitch * gridY) / gridY;
+				auto& rotationVector = XMLoadFloat4(&XMFLOAT4(pitch, yaw, t.roll, 0.0f));
 				worldMatrix = XMMatrixScalingFromVector(scaleVector) *
 					XMMatrixRotationRollPitchYawFromVector(rotationVector) *
 					XMMatrixTranslationFromVector(translationVector);
