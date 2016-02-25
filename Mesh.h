@@ -60,8 +60,8 @@ public:
 	static Mesh* LoadPlane(unsigned columns = 1, unsigned rows = 1);
 	static Mesh* LoadCubeSphere(unsigned gridSize = 10);
 	static Mesh* LoadSphere(unsigned longitudes = 24, unsigned latitudes = 24);
-	static Mesh* LoadPartialSphere(unsigned longitudes = 24, unsigned latitudes = 24, float yawMin = 0.0f, float yawMax = TWOPI, float pitchMin = 0.0f, float pitchMax = PI);
+	static Mesh* LoadPartialSphere(unsigned longitudes = 24, unsigned latitudes = 24, float yawMin = 0.0f, float yawMax = TWOPI, float pitchMin = 0.0f, float pitchMax = PI, unsigned flags = 0u);
 	static Mesh* LoadRecursiveHemisphere(unsigned gridSize = 4, unsigned iterations = 3);
 	static Mesh* LoadFromFile(string path);
-	void CreateBuffers();
+	void CreateBuffers(unsigned flags = 0u);
 };

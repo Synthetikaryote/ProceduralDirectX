@@ -13,6 +13,8 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="RenderTarget.cpp" />
+    <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="DepthStencilState.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LitTexturePS.hlsl">
@@ -43,6 +45,8 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="RenderTarget.h" />
+    <ClInclude Include="Sprite.h" />
+    <ClInclude Include="DepthStencilState.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shaders">

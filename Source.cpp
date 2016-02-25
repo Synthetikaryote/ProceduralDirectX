@@ -28,6 +28,7 @@
 #include "Model.h"
 #include "RenderTarget.h"
 #include "Transform.h"
+#include "DepthStencilState.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -235,6 +236,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	depthStencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 	device->CreateDepthStencilState(&depthStencilDesc, &depthStencilState);
 	context->OMSetDepthStencilState(depthStencilState, 1);  // make it take effect
+	Uber::I().depthStencilState = new DepthStencilState(true, true);
 
 	// create the depth stencil view
 	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
@@ -361,7 +363,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadPartialSphere(24, 24, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f);
+	Mesh* worldMesh = Mesh::LoadPartialSphere(24, 24, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f, D3D11_CPU_ACCESS_WRITE);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -526,14 +528,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			RaycastResult bottomRight = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth), static_cast<int>(Uber::I().windowHeight));
 			if (topLeft.didHit && bottomRight.didHit) {
 				auto& tl = topLeft.hitLocation, br = bottomRight.hitLocation;
+				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
+				XMMATRIX worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
+				XMMATRIX inverseWorld = XMMatrixInverse(nullptr, worldMatrix);
+				// bring the raycast locations back to model space
+				auto tlVec = XMVector4Transform(XMLoadFloat4(&tl), inverseWorld);
+				XMStoreFloat4(&tl, tlVec);
+				auto brVec = XMVector4Transform(XMLoadFloat4(&br), inverseWorld);
+				XMStoreFloat4(&br, brVec);
 				float yawMin = atan2(tl.z, tl.x);
+				if (yawMin < 0.0f) yawMin += TWOPI;
 				float yawMax = atan2(br.z, br.x);
-				float pitchMin = atan2(tl.z, sqrtf(tl.x * tl.x + tl.y * tl.y));
-				float pitchMax = atan2(br.z, sqrtf(br.x * br.x + br.y * br.y));
+				if (yawMax < yawMin) yawMax += TWOPI;
+				float pitchMin = atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI;
+				float pitchMax = atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI;
 				worldMesh->UpdatePartialSphere(24, 24, yawMin, yawMax, pitchMin, pitchMax);
+				swprintf_s(message, L"yaw: %.4f-%.4f  pitch: %.4f-%.4f", yawMin, yawMax, pitchMin, pitchMax);
 			}
 			else {
-
+				worldMesh->UpdatePartialSphere(24, 24, 0.0f, TWOPI, 0.0f, PI);
+				swprintf_s(message, L"full sphere");
 			}
 		}
 
@@ -652,7 +667,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 		// render everything to the scene render target to allow post processing
-		sceneTarget.BeginRender();
+		//sceneTarget.BeginRender();
 
 		for (auto* model : models) {
 			// add rotation to the sphere
@@ -708,13 +723,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 
 		// switch back to the back buffer
-		sceneTarget.EndRender();
+		//sceneTarget.EndRender();
 
 		// post processing
-		postProcessShader->SwitchTo();
-		sceneTarget.BindTexture(0);
-		screen->meshes[0]->Draw();
-		sceneTarget.UnbindTexture(0);
+		//postProcessShader->SwitchTo();
+		//sceneTarget.BindTexture(0);
+		//screen->meshes[0]->Draw();
+		//sceneTarget.UnbindTexture(0);
 
 		// show the fps
 		++framesDrawn;
@@ -730,6 +745,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
 		d2dContext->DrawTextW(fps, fpsLength, textFormat, D2D1::RectF(10.f, 10.f, 410.f, 110.f), whiteBrush);
 		d2dContext->DrawTextW(message, (UINT32)wcslen(message), textFormat, D2D1::RectF(10.f, 120.f, 810.f, 110.f), whiteBrush);
+		
 		d2dContext->EndDraw();
 
 		// Present the back buffer to the screen since rendering is complete.

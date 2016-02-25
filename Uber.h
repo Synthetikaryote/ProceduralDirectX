@@ -8,6 +8,7 @@
 #include <dinput.h>
 class ResourceManager;
 class Camera;
+class DepthStencilState;
 using namespace std;
 using namespace Microsoft::WRL;
 
@@ -72,4 +73,5 @@ public:
 	unsigned windowHeight = 0;
 	unsigned windowLeft = 0;
 	unsigned windowTop = 0;
+	DepthStencilState* depthStencilState;
 };

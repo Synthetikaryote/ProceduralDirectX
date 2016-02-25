@@ -88,26 +88,37 @@ Mesh* Mesh::LoadSphere(unsigned longitudes, unsigned latitudes) {
 	return LoadPartialSphere(longitudes, latitudes, 0.0f, TWOPI, 0.0f, PI);
 }
 
-Mesh* Mesh::LoadPartialSphere(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
+Mesh* Mesh::LoadPartialSphere(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax, unsigned flags) {
 	char keyString[255];
 	sprintf_s(keyString, "MeshPartialSphere%u,%u,%f,%f,%f,%f", longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
 	size_t key = hash<string>()(string(keyString));
 
-	return Uber::I().resourceManager->Load<Mesh>(key, [longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax] {
+	return Uber::I().resourceManager->Load<Mesh>(key, [longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax, flags] {
 		Mesh* mesh = GeneratePartialSphereNoBuffers(longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
-		mesh->CreateBuffers();
+		mesh->CreateBuffers(flags);
 		return mesh;
 	});
 }
 
 void Mesh::UpdatePartialSphere(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
-	//Mesh* mesh = GeneratePartialSphereNoBuffers(longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
-	//vertexCount = mesh->vertexCount;
-	//indexCount = mesh->indexCount;
-	//delete[] vertices;
-	//delete[] indices;
-	//vertices = mesh->vertices;
-	//indices = mesh->indices;
+	Mesh* mesh = GeneratePartialSphereNoBuffers(longitudes, latitudes, yawMin, yawMax, pitchMin, pitchMax);
+	vertexCount = mesh->vertexCount;
+	indexCount = mesh->indexCount;
+	delete[] vertices;
+	delete[] indices;
+	vertices = mesh->vertices;
+	indices = mesh->indices;
+
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	Uber::I().context->Map(vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	memcpy(mappedResource.pData, vertices, sizeof(*vertices) * vertexCount);
+	Uber::I().context->Unmap(vertexBuffer, 0);
+	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	Uber::I().context->Map(indexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	memcpy(mappedResource.pData, indices, sizeof(*indices) * indexCount);
+	Uber::I().context->Unmap(indexBuffer, 0);
+
 	//D3D11_SUBRESOURCE_DATA vertexData = {vertices, 0u, 0u};
 	//Uber::I().context->UpdateSubresource(vertexBuffer, 0, nullptr, &vertexData, sizeof(Vertex) * vertexCount, 0u);
 	//D3D11_SUBRESOURCE_DATA indexData = {indices, 0u, 0u};
@@ -169,17 +180,17 @@ Mesh* Mesh::LoadFromFile(string path) {
 	});
 }
 
-void Mesh::CreateBuffers() {
+void Mesh::CreateBuffers(unsigned flags) {
 	assert(vertices);
 	assert(indices);
 
 	if (vertexBuffer) vertexBuffer->Release();
 	if (indexBuffer) indexBuffer->Release();
 
-	D3D11_BUFFER_DESC vertexDesc = { sizeof(Vertex) * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0u, 0u, 0u };
+	D3D11_BUFFER_DESC vertexDesc = { sizeof(Vertex) * vertexCount, flags ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, flags, 0u, 0u };
 	D3D11_SUBRESOURCE_DATA vertexData = { vertices, 0u, 0u };
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&vertexDesc, &vertexData, &vertexBuffer));
-	D3D11_BUFFER_DESC indexDesc = { sizeof(unsigned long) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, 0u, 0u, 0u };
+	D3D11_BUFFER_DESC indexDesc = {sizeof(unsigned long) * indexCount, flags ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, flags, 0u, 0u};
 	D3D11_SUBRESOURCE_DATA indexData = { indices, 0u, 0u };
 	ThrowIfFailed(Uber::I().device->CreateBuffer(&indexDesc, &indexData, &indexBuffer));
 }

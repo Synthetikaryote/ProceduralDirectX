@@ -9,7 +9,7 @@
 using namespace std;
 
 void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsigned& h, DXGI_FORMAT& format, unsigned& pitch);
-ID3D11Texture2D* CreateTexture2D(string path, DXGI_FORMAT& format);
+ID3D11Texture2D* CreateTexture2D(string path, unsigned& w, unsigned& h, unsigned& pitch, DXGI_FORMAT& format);
 ID3D11Texture2D* CreateTextureCube(vector<string> paths, DXGI_FORMAT& format);
 
 Texture::Texture() {}
@@ -23,7 +23,7 @@ Texture* Texture::Load(string& path) {
 	size_t key = hash<string>()(string(filename));
 	return Uber::I().resourceManager->Load<Texture>(key, [path]{
 		Texture* t = new Texture();
-		t->texture = CreateTexture2D(path, t->format);
+		t->texture = CreateTexture2D(path, t->w, t->h, t->pitch, t->format);
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 		srvDesc.Format = t->format;
 		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -101,9 +101,8 @@ void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsig
 	FreeImage_Unload(imageData);
 }
 
-ID3D11Texture2D* CreateTexture2D(string path, DXGI_FORMAT& format) {
+ID3D11Texture2D* CreateTexture2D(string path, unsigned& w, unsigned& h, unsigned& pitch, DXGI_FORMAT& format) {
 	unsigned char* textureData = nullptr;
-	unsigned w, h, pitch;
 	GetTextureData(path, textureData, w, h, format, pitch);
 	DXGI_SAMPLE_DESC sampleDesc = {1, 0};
 	unsigned mips = (unsigned)max(ceil(log2(w)), ceil(log2(h)));

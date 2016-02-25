@@ -22,6 +22,7 @@ public:
 	DXGI_FORMAT format;
 	ID3D11ShaderResourceView* shaderResourceView;
 	bool isTextureCube = false;
+	unsigned w, h, pitch;
 
 	static Texture* Load(string& path);
 	static Texture* LoadCube(vector<string>& paths);
