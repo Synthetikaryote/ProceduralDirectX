@@ -247,20 +247,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	device->CreateDepthStencilView(depthStencilBuffer, &depthStencilViewDesc, &Uber::I().depthStencilView);
 
 	// custom raster options, like draw as wireframe
-	ID3D11RasterizerState* rasterState = nullptr;
-	D3D11_RASTERIZER_DESC rasterDesc;
-	rasterDesc.AntialiasedLineEnable = false;
-	rasterDesc.CullMode = D3D11_CULL_BACK;
-	rasterDesc.DepthBias = 0;
-	rasterDesc.DepthBiasClamp = 0.0f;
-	rasterDesc.DepthClipEnable = true;
-	rasterDesc.FillMode = D3D11_FILL_SOLID;
-	rasterDesc.FrontCounterClockwise = false;
-	rasterDesc.MultisampleEnable = false;
-	rasterDesc.ScissorEnable = false;
-	rasterDesc.SlopeScaledDepthBias = 0.0f;
-	device->CreateRasterizerState(&rasterDesc, &rasterState);
-	context->RSSetState(rasterState);
+	ID3D11RasterizerState* rasterStateSolid = nullptr;
+	ID3D11RasterizerState* rasterStateWireframe = nullptr;
+	D3D11_RASTERIZER_DESC rasterDescSolid, rasterDescWireframe;
+	rasterDescSolid.AntialiasedLineEnable = false;
+	rasterDescSolid.CullMode = D3D11_CULL_BACK;
+	rasterDescSolid.DepthBias = 0;
+	rasterDescSolid.DepthBiasClamp = 0.0f;
+	rasterDescSolid.DepthClipEnable = true;
+	rasterDescSolid.FillMode = D3D11_FILL_SOLID;
+	rasterDescSolid.FrontCounterClockwise = false;
+	rasterDescSolid.MultisampleEnable = false;
+	rasterDescSolid.ScissorEnable = false;
+	rasterDescSolid.SlopeScaledDepthBias = 0.0f;
+	rasterDescWireframe = rasterDescSolid;
+	rasterDescWireframe.FillMode = D3D11_FILL_WIREFRAME;
+	device->CreateRasterizerState(&rasterDescSolid, &rasterStateSolid);
+	device->CreateRasterizerState(&rasterDescWireframe, &rasterStateWireframe);
+	context->RSSetState(rasterStateSolid);
 
 	// set up the viewport
 	Uber::I().viewport.Width = static_cast<float>(Uber::I().windowWidth);
@@ -500,6 +504,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		else if (IsKeyDown(DIK_3)) {
 			raiseDir = 0.0f;
 			flattenHeight = 0.0f;
+		}
+		else if (IsKeyDown(DIK_7)) {
+			context->RSSetState(rasterStateSolid);
+		}
+		else if (IsKeyDown(DIK_8)) {
+			context->RSSetState(rasterStateWireframe);
 		}
 
 		// read the input
@@ -793,7 +803,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//if (texturePixelShader) texturePixelShader->Release();
 	//if (colorShaderInputLayout) colorShaderInputLayout->Release();
 	//if (colorVertexShader) colorVertexShader->Release();
-	if (rasterState) rasterState->Release();
+	if (rasterStateSolid) rasterStateSolid->Release();
+	if (rasterStateWireframe) rasterStateWireframe->Release();
 	//if (colorPixelShader) colorPixelShader->Release();
 	if (Uber::I().depthStencilView) Uber::I().depthStencilView->Release();
 	if (depthStencilState) depthStencilState->Release();
