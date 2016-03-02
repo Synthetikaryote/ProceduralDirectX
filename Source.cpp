@@ -382,21 +382,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	worldMesh->shader = litTexture;
 	world->meshes.push_back(worldMesh);
 
-	//auto* duckTexture = Texture::Load(string("Models/duck.tga"));
-	//Mesh* duckMesh = Mesh::LoadFromFile("duck.txt");
-	//duckMesh->shader = litTexture;
-	//litTexture->AddRef();
-	//TextureBinding duckDiffuseBinding = {duckTexture, ShaderTypePixel, duckTexture->isTextureCube ? 1 : 0};
-	//duckMesh->textureBindings = {duckDiffuseBinding};
-	//Model* duck = new Model();
-	//duck->meshes.push_back(duckMesh);
-	//duck->transform->x = -0.8f;
-	//duck->transform->y = 0.0f;
-	//duck->transform->z = -0.8f;
-	//duck->transform->scaleX = 0.2f;
-	//duck->transform->scaleY = 0.2f;
-	//duck->transform->scaleZ = 0.2f;
-	vector<Model*> models = { world/*, duck*/ };
+	auto* duckTexture = Texture::Load(string("Models/duck.tga"));
+	Mesh* duckMesh = Mesh::LoadFromFile("duck.txt");
+	duckMesh->shader = litTexture;
+	litTexture->AddRef();
+	TextureBinding duckDiffuseBinding = {duckTexture, ShaderTypePixel, duckTexture->isTextureCube ? 1 : 0};
+	duckMesh->textureBindings = {duckDiffuseBinding};
+	Model* duck = new Model();
+	duck->meshes.push_back(duckMesh);
+	duck->transform->x = -1.4f;
+	duck->transform->y = -0.25f;
+	duck->transform->z = -1.4f;
+	duck->transform->scaleX = 0.4f;
+	duck->transform->scaleY = 0.4f;
+	duck->transform->scaleZ = 0.4f;
+	vector<Model*> models = { world, duck };
 
 	// set up the camera
 	Uber::I().camera = new Camera(PI / 4.0f, static_cast<float>(Uber::I().windowWidth) / Uber::I().windowHeight, 0.00001f, 1000.0f);
@@ -404,24 +404,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->sensitivity = { 0.002f, 0.002f, 0.002f };
 	Uber::I().camera->SetFocus(world);
 
-	//// camera for shadows
-	//Uber::I().lightCamera = new Camera(PI / 2.0f, 1.0f, 0.00001f, 1000.0f);
-	//Uber::I().lightCamera->position = XMFLOAT3(-500.0f, 0.0f, -500.0f);
-	//Uber::I().lightCamera->SetFocus(world);
-	//RenderTarget depthMap(1024, 1024, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
-	//// shader for shadows
-	//Shader* depthMapShader = Shader::LoadShader("DepthMapVS.cso", "", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, samplerDesc);
-	//depthMapShader->vertexShaderConstantBuffers = {depthMapBuffer.buffer};
-	//depthMapShader->pixelShaderConstantBuffers = {depthMapBuffer.buffer};
-	//// shadow transform matrix
-	//// converts [-1:1, -1:1] to [0:1, 0:1]
-	//XMFLOAT4X4 matNDCtoUV(
-	//	0.5f, 0.0f, 0.0f, 0.0f,
-	//	0.0f, -0.5f, 0.0f, 0.0f,
-	//	0.0f, 0.0f, 1.0f, 0.0f,
-	//	0.5f, 0.5f, 0.0f, 1.0f
-	//);
-
+	// camera for shadows
+	Uber::I().lightCamera = new Camera(PI / 2.0f, 1.0f, 0.00001f, 1000.0f);
+	Uber::I().lightCamera->position = XMFLOAT3(-2.0f, 0.0f, -2.0f);
+	Uber::I().lightCamera->yaw = PI * 0.25f;
+	Uber::I().lightCamera->Update(0.0f);
+	RenderTarget depthMap(1024, 1024, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
+	// shader for shadows
+	Shader* depthMapShader = Shader::LoadShader("DepthMapVS.cso", "", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, samplerDesc);
+	depthMapShader->vertexShaderConstantBuffers = {depthMapBuffer.buffer};
+	// shadow transform matrix
+	// converts [-1:1, -1:1] to [0:1, 0:1]
+	XMFLOAT4X4 matNDCtoUV(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f
+	);
+	vector<Model*> shadowCasters = {duck, world};
+	// add the depthMap to the world bindings
+	Texture* depthMapTexture = new Texture();
+	depthMapTexture->shaderResourceView = depthMap.shaderResourceView;
+	TextureBinding depthMapBinding = {depthMapTexture, ShaderTypePixel, 4};
+	depthMapTexture->AddRef();
+	worldMesh->textureBindings.push_back(depthMapBinding);
+	D3D11_SAMPLER_DESC shadowSamplerDesc = {D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_BORDER, D3D11_TEXTURE_ADDRESS_BORDER, D3D11_TEXTURE_ADDRESS_BORDER, 0.0f, 1, D3D11_COMPARISON_ALWAYS, {1, 1, 1, 1}, 0, D3D11_FLOAT32_MAX};
+	ID3D11SamplerState* shadowSamplerState;
+	ThrowIfFailed(device->CreateSamplerState(&shadowSamplerDesc, &shadowSamplerState));
 
 	// text
 	// create a white brush
@@ -459,6 +468,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float flattenHeight = 0.0f;
 	bool flatten = false;
 	bool wireframe = false;
+	bool showDepthMap = false;
 
 	// main loop
 	MSG msg = { 0 };
@@ -506,13 +516,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			raiseDir = 0.0f;
 			flattenHeight = 0.0f;
 		}
-		else if (IsKeyDown(DIK_7)) {
-			wireframe = false;
-			
+		else if (IsKeyDown(DIK_F1)) {
+			showDepthMap = false;
+			postProcessBuffer.data.flags = 0;
+			postProcessBuffer.UpdateSubresource();
 		}
-		else if (IsKeyDown(DIK_8)) {
+		else if (IsKeyDown(DIK_F2)) {
+			showDepthMap = true;
+			postProcessBuffer.data.flags = PSFlags::ShowDepthBuffer;
+			postProcessBuffer.UpdateSubresource();
+		}
+		else if (IsKeyDown(DIK_F3)) {
+			wireframe = false;
+		}
+		else if (IsKeyDown(DIK_F4)) {
 			wireframe = true;
-			context->RSSetState(rasterStateWireframe);
+		}
+		else if (IsKeyDown(DIK_F5)) {
+			Uber::I().camera->focus = nullptr;
+		}
+		else if (IsKeyDown(DIK_F6)) {
+			Uber::I().camera->focus = world;
 		}
 
 		// read the input
@@ -529,6 +553,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			Uber::I().mouseX = windowMousePos.x;
 			Uber::I().mouseY = windowMousePos.y;
 		}
+
+		// update the objects
+		duck->transform->yaw += 0.2f * elapsed;
 
 		// update the camera
 		bool cameraChanged = Uber::I().camera->Update(elapsed);
@@ -661,35 +688,36 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		context->ClearDepthStencilView(Uber::I().depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 		// first, do the depth map pass
-		//depthMap.BeginRender();
-		//depthMapShader->SwitchTo();
-		//for (auto* model : models) {
-		//	Transform& t = *model->transform;
-		//	//worldMatrix = XMMatrixIdentity();
-		//	auto& scaleVector = XMLoadFloat4(&XMFLOAT4(t.scaleX, t.scaleY, t.scaleZ, 0.0f));
-		//	auto& translationVector = XMLoadFloat4(&XMFLOAT4(t.x, t.y, t.z, 1.0f));
-		//	auto& rotationVector = XMLoadFloat4(&XMFLOAT4(t.pitch, t.yaw, t.roll, 0.0f));
-		//	worldMatrix = XMMatrixScalingFromVector(scaleVector) *
-		//		XMMatrixRotationRollPitchYawFromVector(rotationVector) *
-		//		XMMatrixTranslationFromVector(translationVector);
-		//	XMMATRIX worldViewProj = worldMatrix * XMLoadFloat4x4(&Uber::I().lightCamera->view) * XMLoadFloat4x4(&Uber::I().lightCamera->proj);
-		//	depthMapBuffer.data.worldViewProj = XMMatrixTranspose(worldViewProj);
+		depthMap.BeginRender();
+		depthMapShader->SwitchTo();
+		for (auto* model : shadowCasters) {
+			Transform& t = *model->transform;
+			//worldMatrix = XMMatrixIdentity();
+			auto& scaleVector = XMLoadFloat4(&XMFLOAT4(t.scaleX, t.scaleY, t.scaleZ, 0.0f));
+			auto& translationVector = XMLoadFloat4(&XMFLOAT4(t.x, t.y, t.z, 1.0f));
+			auto& rotationVector = XMLoadFloat4(&XMFLOAT4(t.pitch, t.yaw, t.roll, 0.0f));
+			worldMatrix = XMMatrixScalingFromVector(scaleVector) *
+				XMMatrixRotationRollPitchYawFromVector(rotationVector) *
+				XMMatrixTranslationFromVector(translationVector);
+			XMMATRIX worldViewProj = worldMatrix * XMLoadFloat4x4(&Uber::I().lightCamera->view) * XMLoadFloat4x4(&Uber::I().lightCamera->proj);
+			depthMapBuffer.data.worldViewProj = XMMatrixTranspose(worldViewProj);
 
-		//	for (auto* mesh : model->meshes) {
-		//		for (auto& binding : mesh->depthMapTextureBindings) {
-		//			switch (binding.shaderType) {
-		//				case ShaderTypeVertex:
-		//					depthMapBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
-		//					break;
-		//				default:
-		//					break;
-		//			}
-		//		}
-		//		depthMapBuffer.UpdateSubresource();
-		//		mesh->DrawDepthMap();
-		//	}
-		//}
-		//depthMap.EndRender();
+			for (auto* mesh : model->meshes) {
+				for (auto& binding : mesh->depthMapTextureBindings) {
+					switch (binding.shaderType) {
+						case ShaderTypeVertex:
+							depthMapBuffer.data.vsSlotsUsed |= 1 << binding.shaderSlot;
+							break;
+						default:
+							break;
+					}
+				}
+
+				depthMapBuffer.UpdateSubresource();
+				mesh->DrawDepthMap();
+			}
+		}
+		depthMap.EndRender();
 
 
 		// render everything to the scene render target to allow post processing
@@ -724,12 +752,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			matrixBuffer.data.view = XMMatrixTranspose(viewMatrix);
 			matrixBuffer.data.projection = XMMatrixTranspose(projectionMatrix);
 			matrixBuffer.UpdateSubresource();
+			XMMATRIX lightViewMatrix = XMLoadFloat4x4(&Uber::I().lightCamera->view);
+			XMMATRIX lightProjectionMatrix = XMLoadFloat4x4(&Uber::I().lightCamera->proj);
+			// to do:  something's wrong with this
+			lightingBuffer.data.shadowMatrix = worldMatrix * lightViewMatrix * lightProjectionMatrix * XMLoadFloat4x4(&matNDCtoUV);
+			lightingBuffer.UpdateSubresource();
 
 			for (auto* mesh : model->meshes) {
 
 				// render the model using the lit texture shader
 
 				mesh->shader->SwitchTo();
+				// hack in the shadow sampler
+				if (mesh->shader == litTexture) {
+					Uber::I().context->PSSetSamplers(1, 1, &shadowSamplerState);
+				}
 
 				// set the material settings
 				materialBuffer.data.materialAmbient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -747,7 +784,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							break;
 					}
 				}
-				//materialBuffer.data.psFlags = PSFlags::CelShading;
 				materialBuffer.UpdateSubresource();
 
 				mesh->Draw();
@@ -760,9 +796,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 		// post processing
 		postProcessShader->SwitchTo();
-		sceneTarget.BindTexture(0);
+		//sceneTarget.BindTexture(0);
+		if (showDepthMap)
+			depthMap.BindTexture(0);
+		else
+			sceneTarget.BindTexture(0);
 		screen->meshes[0]->Draw();
-		sceneTarget.UnbindTexture(0);
+		//sceneTarget.UnbindTexture(0);
+		if (showDepthMap)
+			depthMap.UnbindTexture(0);
+		else
+			sceneTarget.UnbindTexture(0);
 
 		// show the fps
 		++framesDrawn;
@@ -794,6 +838,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	for (auto model : models) delete model;
 	delete screen;
 	postProcessShader->Release();
+	depthMapShader->Release();
+	if (shadowSamplerState) shadowSamplerState->Release();
 	Uber::I().resourceManager->Terminate();
 	delete Uber::I().resourceManager;
 	delete Uber::I().camera;

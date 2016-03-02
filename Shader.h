@@ -6,7 +6,8 @@
 class Texture;
 
 enum PSFlags {
-	CelShading = 1
+	CelShading = 1,
+	ShowDepthBuffer = 2
 };
 
 using namespace std;

@@ -39,7 +39,13 @@ RenderTarget::RenderTarget(unsigned width, unsigned height, DXGI_FORMAT colorFor
 		desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 		ThrowIfFailed(Uber::I().device->CreateTexture2D(&desc, nullptr, &texture));
 	}
-	ThrowIfFailed(Uber::I().device->CreateDepthStencilView(texture, nullptr, &depthStencilView));
+	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
+	ZeroMemory(&depthStencilViewDesc, sizeof(depthStencilViewDesc));
+	depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	depthStencilViewDesc.Texture2D.MipSlice = 0;
+
+	ThrowIfFailed(Uber::I().device->CreateDepthStencilView(texture, &depthStencilViewDesc, &depthStencilView));
 	texture->Release();
 
 	viewport = {0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f};

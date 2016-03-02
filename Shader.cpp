@@ -36,7 +36,7 @@ void Shader::SetTexture(Texture* texture, unsigned slot) {
 
 Shader* Shader::LoadShader(string vertexCompiledPath, string pixelCompiledPath, vector<D3D11_INPUT_ELEMENT_DESC> vertexInputDesc, D3D11_SAMPLER_DESC samplerDesc) {
 	char keyString[512];
-	sprintf_s(keyString, "Shader%s%s", vertexCompiledPath, pixelCompiledPath);
+	sprintf_s(keyString, "Shader%s%s", vertexCompiledPath.size() > 0 ? vertexCompiledPath.c_str() : "(none)", pixelCompiledPath.size() > 0 ? pixelCompiledPath.c_str() : "(none)");
 	size_t key = hash<string>()(string(keyString));
 	return Uber::I().resourceManager->Load<Shader>(key, [&vertexCompiledPath, &pixelCompiledPath, &vertexInputDesc, &samplerDesc] {
 		Shader* s = new Shader();

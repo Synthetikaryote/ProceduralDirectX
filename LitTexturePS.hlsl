@@ -3,7 +3,9 @@ Texture2D tex : register(t0);
 TextureCube cubeTexture : register(t1);
 Texture2D spec : register(t2);
 Texture2D normalMap : register(t3);
-SamplerState SampleType;
+Texture2D shadowMap : register(t4);
+SamplerState SampleType : register(s0);
+SamplerState SamplerShadow : register(s1);
 
 cbuffer MaterialBuffer : register(b0) {
     float4 materialAmbient;
@@ -19,6 +21,7 @@ cbuffer LightingBuffer : register(b1) {
     float4 lightAmbient;
     float4 lightDiffuse;
     float4 lightSpecular;
+	matrix shadowMatrix;
 };
 cbuffer BrushBuffer : register(b2) {
     float4 cursorPosition;
@@ -36,6 +39,7 @@ struct VertexShaderOutput {
     float3 dirToLight : TEXCOORD3;
     float3 dirToView : TEXCOORD4;
     float4 worldPos : TEXCOORD5;
+	float4 shadowPosition : TEXCOORD6;
 };
 
 // pixel shader
@@ -95,6 +99,18 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
         }
     }
 
-    return (diffuse + ambient) * diffuseColor + (specular * specularColor);
-	//return specularColor;
+	float4 litColor = (diffuse + ambient) * diffuseColor + (specular * specularColor);
+
+	// shadow
+	if (psSlotsUsed & 1 << 4) {
+		float3 shadowPosition = input.shadowPosition.xyz / input.shadowPosition.w;
+		float pixelDepth = shadowPosition.z;
+		float sampledDepth = shadowMap.Sample(SamplerShadow, shadowPosition.xy).r + 0.0001;
+		if (pixelDepth > sampledDepth) {
+			litColor = (ambient) * diffuseColor + (specular * specularColor);
+		}
+	}
+
+	return litColor;
+
 }

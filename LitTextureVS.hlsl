@@ -21,6 +21,7 @@ cbuffer LightingBuffer : register(b2) {
     float4 lightAmbient;
     float4 lightDiffuse;
     float4 lightSpecular;
+	matrix shadowMatrix;
 };
 
 // typedefs
@@ -38,6 +39,7 @@ struct VertexShaderOutput {
     float3 dirToLight : TEXCOORD3;
     float3 dirToView : TEXCOORD4;
     float4 worldPos : TEXCOORD5;
+	float4 shadowPosition : TEXCOORD6;
 };
 
 // vertex shader
@@ -72,6 +74,8 @@ VertexShaderOutput main(VertexShaderInput input) {
     output.dirToLight = -lightDirection.xyz;
     output.dirToView = viewPosition.xyz - posWorld.xyz;
     output.tex = input.tex;
+
+	output.shadowPosition = mul(position, shadowMatrix);
 
     return output;
 }

@@ -46,7 +46,7 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 	//float2 dx = ddx(input.tex).x;
 	//float2 dy = ddy(input.tex).y;
 
-	if (flags) {
+	if (flags == 1) {
 		float deltaU = 1.0f / windowSize.x;
 		float deltaV = 1.0f / windowSize.y;
 		float2 offset[9] = {
@@ -70,6 +70,14 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 				valY += kernelY[i] * texColor.xyz;
 			}
 		color *= (length((valX * valX) + (valY * valY)) > 0.5f) ? 0.0f : 1.0f;
+	}
+
+	if (flags == 2) {
+		float depth = color.r;
+		float near = 0.00001f;
+		float far = 1000.0f;
+		float linearDepth = (2.0f * near) / (far + near - depth * (far - near));
+		color = linearDepth;
 	}
 
     return color;
