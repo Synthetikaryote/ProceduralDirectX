@@ -458,6 +458,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float raiseDir = 1.0f;
 	float flattenHeight = 0.0f;
 	bool flatten = false;
+	bool wireframe = false;
 
 	// main loop
 	MSG msg = { 0 };
@@ -506,9 +507,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			flattenHeight = 0.0f;
 		}
 		else if (IsKeyDown(DIK_7)) {
-			context->RSSetState(rasterStateSolid);
+			wireframe = false;
+			
 		}
 		else if (IsKeyDown(DIK_8)) {
+			wireframe = true;
 			context->RSSetState(rasterStateWireframe);
 		}
 
@@ -690,7 +693,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 		// render everything to the scene render target to allow post processing
-		//sceneTarget.BeginRender();
+		context->RSSetState(wireframe ? rasterStateWireframe : rasterStateSolid);
+		sceneTarget.BeginRender();
 
 		for (auto* model : models) {
 			// add rotation to the sphere
@@ -751,13 +755,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 
 		// switch back to the back buffer
-		//sceneTarget.EndRender();
+		sceneTarget.EndRender();
+		context->RSSetState(rasterStateSolid);
 
 		// post processing
-		//postProcessShader->SwitchTo();
-		//sceneTarget.BindTexture(0);
-		//screen->meshes[0]->Draw();
-		//sceneTarget.UnbindTexture(0);
+		postProcessShader->SwitchTo();
+		sceneTarget.BindTexture(0);
+		screen->meshes[0]->Draw();
+		sceneTarget.UnbindTexture(0);
 
 		// show the fps
 		++framesDrawn;
