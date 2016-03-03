@@ -253,6 +253,24 @@ Mesh* GeneratePlane(unsigned columns, unsigned rows) {
 // make a part of a sphere within the yaw and pitch ranges
 Mesh* GeneratePartialSphereNoBuffers(unsigned longitudes, unsigned latitudes, float yawMin, float yawMax, float pitchMin, float pitchMax) {
 	Mesh* mesh = new Mesh();
+	if (yawMin > yawMax) {
+		float ratio = (TWOPI - yawMin) / (yawMax - (yawMin - TWOPI));
+		Mesh* mesh1 = GeneratePartialSphereNoBuffers(longitudes * ratio, latitudes, yawMin, TWOPI, pitchMin, pitchMax);
+		Mesh* mesh2 = GeneratePartialSphereNoBuffers(longitudes * (1.0f - ratio), latitudes, 0.0f, yawMax, pitchMin, pitchMax);
+		mesh->vertexCount = mesh1->vertexCount + mesh2->vertexCount;
+		mesh->indexCount = mesh1->indexCount + mesh2->indexCount;
+		mesh->vertices = new Vertex[mesh->vertexCount];
+		mesh->indices = new unsigned long[mesh->indexCount];
+		// shift the indices of mesh2
+		for (int i = 0; i < mesh2->indexCount; ++i) mesh2->indices[i] += mesh1->vertexCount;
+		memcpy(mesh->vertices, mesh1->vertices, sizeof(Vertex) * mesh1->vertexCount);
+		memcpy(&(mesh->vertices[mesh1->vertexCount]), mesh2->vertices, sizeof(Vertex) * mesh2->vertexCount);
+		memcpy(mesh->indices, mesh1->indices, sizeof(unsigned long) * mesh1->indexCount);
+		memcpy(&(mesh->indices[mesh1->indexCount]), mesh2->indices, sizeof(unsigned long) * mesh2->indexCount);
+		delete mesh1;
+		delete mesh2;
+		return mesh;
+	}
 	mesh->vertexCount = latitudes * (longitudes + 1);
 	float skippedRows = (pitchMin == 0.0f ? 0.5f : 0.0f) + (pitchMax == PI ? 0.5f : 0.0f);
 	mesh->indexCount = (latitudes - 1.0f - skippedRows) * (longitudes + 1) * 2 * 3;
