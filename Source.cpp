@@ -579,16 +579,48 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				// bring the raycast locations back to model space
 				for (auto* v : {&tl, &tm, &tr, &bl, &bm, &br})
 					XMStoreFloat4(v, XMVector4Transform(XMLoadFloat4(v), inverseWorld));
-				float yawMin = min(atan2(tl.z, tl.x), atan2(bl.z, bl.x));
-				if (yawMin < 0.0f) yawMin += TWOPI;
-				float yawMax = max(atan2(br.z, br.x), atan2(tr.z, tr.x));
-				if (yawMax < 0.0f) yawMax += TWOPI;
-				float pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
-					atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
-					atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);
-				float pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
-					atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
-					atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
+				float yawTop = atan2(tm.z, tm.x);
+				float yawBot = atan2(bm.z, bm.x);
+				float yawMin = 0.0f;
+				float yawMax = TWOPI;
+				float pitchMin = 0.0f;
+				float pitchMax = PI;
+				float epsilon = 0.001f;
+				if (abs(yawTop - yawBot) > epsilon) {
+					// looking at top or bottom
+					float pitchTop = atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI;
+					float pitchBot = atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI;
+					if (pitchTop < HALFPI) {
+						// top
+						assert(pitchBot < HALFPI);
+						pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
+							atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
+							atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
+					}
+					else {
+						// bottom
+						assert(pitchBot >= HALFPI);
+						pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
+							atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
+							atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);
+					}
+				}
+				else {
+					auto GetYaw = [](XMFLOAT4& p) -> float {
+						float yaw = atan2(p.z, p.x);
+						if (yaw < 0.0f) yaw += TWOPI;
+						return yaw;
+					};
+					yawMin = min(GetYaw(tl), GetYaw(bl));
+					yawMax = max(GetYaw(br), GetYaw(tr));
+					if (yawMax < 0.0f) yawMax += TWOPI;
+					pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
+						atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
+						atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);
+					pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
+						atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
+						atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
+				}
 				// round the bounds to the nearest grid point
 				float gridX = 128.0f; //diffuseTexture->w;
 				float gridY = 64.0f; //diffuseTexture->h;
