@@ -405,8 +405,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->SetFocus(world);
 
 	// camera for shadows
-	Uber::I().lightCamera = new Camera(PI / 2.0f, 1.0f, 0.01f, 100.0f);
-	Uber::I().lightCamera->position = XMFLOAT3(-2.0f, 0.0f, -2.0f);
+	Uber::I().lightCamera = new Camera(PI / 16.0f, 1.0f, 0.1f, 100.0f);
+	Uber::I().lightCamera->position = XMFLOAT3(-15.0f, 0.0f, -15.0f);
 	Uber::I().lightCamera->yaw = PI * 0.25f;
 	Uber::I().lightCamera->Update(0.0f);
 	RenderTarget depthMap(4096, 4096, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
@@ -592,14 +592,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					float pitchBot = atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI;
 					if (pitchTop < HALFPI) {
 						// top
-						assert(pitchBot < HALFPI);
+						assert(pitchBot < HALFPI || !Uber::I().camera->focus);
 						pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
 							atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
 							atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
 					}
 					else {
 						// bottom
-						assert(pitchBot >= HALFPI);
+						assert(pitchBot >= HALFPI || !Uber::I().camera->focus);
 						pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
 							atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
 							atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);

@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 	const aiScene* scene = importer.ReadFile(argv[1],
 		aiProcess_CalcTangentSpace |
 		aiProcess_Triangulate |
-		aiProcess_JoinIdenticalVertices |
+		//aiProcess_JoinIdenticalVertices |
 		aiProcess_SortByPType |
 		aiProcess_FlipUVs);
 	if (!scene) {

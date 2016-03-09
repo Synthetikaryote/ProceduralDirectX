@@ -105,18 +105,33 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 	// shadow
 	if (psSlotsUsed & 1 << 4) {
 		float3 shadowPosition = input.shadowPosition.xyz / input.shadowPosition.w;
-		float pixelDepth = shadowPosition.z;
-		float sum = 0;
-		float x, y;
 
-		for (y = -1.5; y <= 1.5; y += 1.0)
-			for (x = -1.5; x <= 1.5; x += 1.0) {
-				float sampledDepth = shadowMap.Sample(SamplerShadow, shadowPosition.xy + float2(x, y) * shadowMapTexelSize).r + 0.0001;
-				if (pixelDepth > sampledDepth)
-					sum += 1.0f;
-			}
-		float shadowCoeff = 1.0 - sum / 16.0;
-		litColor = (diffuse * shadowCoeff + ambient) * diffuseColor + (specular * specularColor);
+		float shadowCoeff = 1.0f;
+		bool use4Sample = true;
+		if (use4Sample) {
+			// 4-sample pcf from nvidia
+			// http://http.developer.nvidia.com/GPUGems/gpugems_ch11.html
+			float2 offset = (float)(frac(shadowPosition.xy * 0.5) > 0.25);  // mod
+				offset.y += offset.x;  // y ^= x in floating point
+			if (offset.y > 1.1)
+				offset.y = 0;
+			shadowCoeff = 1.0 - (
+				(shadowPosition.z > shadowMap.Sample(SamplerShadow, shadowPosition.xy + (offset + float2(-1.5, 0.5)) * shadowMapTexelSize).r + 0.0001 ? 1.0 : 0.0) +
+				(shadowPosition.z > shadowMap.Sample(SamplerShadow, shadowPosition.xy + (offset + float2(0.5, 0.5)) * shadowMapTexelSize).r + 0.0001 ? 1.0 : 0.0) +
+				(shadowPosition.z > shadowMap.Sample(SamplerShadow, shadowPosition.xy + (offset + float2(-1.5, -1.5)) * shadowMapTexelSize).r + 0.0001 ? 1.0 : 0.0) +
+				(shadowPosition.z > shadowMap.Sample(SamplerShadow, shadowPosition.xy + (offset + float2(0.5, -1.5)) * shadowMapTexelSize).r + 0.0001 ? 1.0 : 0.0)
+			) * 0.25;
+		}
+		else {
+			// brute force 16-hit pcf
+			float sum = 0;
+			float x, y;
+			for (y = -1.5; y <= 1.5; y += 1.0)
+				for (x = -1.5; x <= 1.5; x += 1.0)
+					sum += shadowPosition.z > shadowMap.Sample(SamplerShadow, shadowPosition.xy + float2(x, y) * shadowMapTexelSize).r + 0.0001 ? 1.0 : 0.0;
+			shadowCoeff = 1.0 - sum / 16.0;
+		}
+		litColor = (diffuse * shadowCoeff + ambient) * diffuseColor + (specular * shadowCoeff * specularColor);
 	}
 
 	return litColor;
