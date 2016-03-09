@@ -405,11 +405,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->SetFocus(world);
 
 	// camera for shadows
-	Uber::I().lightCamera = new Camera(PI / 16.0f, 1.0f, 0.1f, 100.0f);
+	Uber::I().lightCamera = new Camera(PI / 32.0f, 1.0f, 0.1f, 100.0f);
 	Uber::I().lightCamera->position = XMFLOAT3(-15.0f, 0.0f, -15.0f);
 	Uber::I().lightCamera->yaw = PI * 0.25f;
 	Uber::I().lightCamera->Update(0.0f);
-	RenderTarget depthMap(4096, 4096, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
+	RenderTarget depthMap(2048, 2048, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
 	// shader for shadows
 	Shader* depthMapShader = Shader::LoadShader("DepthMapVS.cso", "", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, samplerDesc);
 	depthMapShader->vertexShaderConstantBuffers = {depthMapBuffer.buffer};
@@ -533,10 +533,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			wireframe = true;
 		}
 		else if (IsKeyDown(DIK_F5)) {
-			Uber::I().camera->focus = nullptr;
+			Uber::I().camera->SetFocus(nullptr);
+			worldMesh->UpdatePartialSphere(64, 32, 0.0f, TWOPI, 0.0f, PI);
+			swprintf_s(message, L"full sphere");
 		}
 		else if (IsKeyDown(DIK_F6)) {
-			Uber::I().camera->focus = world;
+			Uber::I().camera->SetFocus(world);
+			//Uber::I().camera->focus = world;
 		}
 
 		// read the input
@@ -563,7 +566,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		XMMATRIX viewMatrix = XMLoadFloat4x4(&Uber::I().camera->view);
 		XMMATRIX projectionMatrix = XMLoadFloat4x4(&Uber::I().camera->proj);
 
-		if (cameraChanged) {
+		if (cameraChanged && Uber::I().camera->focus) {
 			RaycastResult topLeft = Uber::I().camera->ScreenRaycastToModelSphere(world, 0, 0);
 			RaycastResult topRight = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth), 0);
 			RaycastResult topMiddle = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth) / 2, 0);
@@ -592,14 +595,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 					float pitchBot = atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI;
 					if (pitchTop < HALFPI) {
 						// top
-						assert(pitchBot < HALFPI || !Uber::I().camera->focus);
+						assert(pitchBot < HALFPI);
 						pitchMax = max(max(atan2(-br.y, sqrtf(br.x * br.x + br.z * br.z)) + HALFPI,
 							atan2(-bm.y, sqrtf(bm.x * bm.x + bm.z * bm.z)) + HALFPI),
 							atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
 					}
 					else {
 						// bottom
-						assert(pitchBot >= HALFPI || !Uber::I().camera->focus);
+						assert(pitchBot >= HALFPI);
 						pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
 							atan2(-tm.y, sqrtf(tm.x * tm.x + tm.z * tm.z)) + HALFPI),
 							atan2(-tr.y, sqrtf(tr.x * tr.x + tr.z * tr.z)) + HALFPI);
