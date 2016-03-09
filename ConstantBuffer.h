@@ -24,6 +24,7 @@ struct LightingBufferType {
 	XMFLOAT4 lightDiffuse;
 	XMFLOAT4 lightSpecular;
 	XMMATRIX shadowMatrix;
+	XMFLOAT2 shadowMapTexelSize;
 };
 struct BrushBufferType {
 	XMFLOAT4 cursorPosition;

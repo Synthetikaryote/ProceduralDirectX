@@ -22,6 +22,7 @@ cbuffer LightingBuffer : register(b1) {
     float4 lightDiffuse;
     float4 lightSpecular;
 	matrix shadowMatrix;
+	float2 shadowMapTexelSize;
 };
 cbuffer BrushBuffer : register(b2) {
     float4 cursorPosition;
@@ -105,10 +106,17 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 	if (psSlotsUsed & 1 << 4) {
 		float3 shadowPosition = input.shadowPosition.xyz / input.shadowPosition.w;
 		float pixelDepth = shadowPosition.z;
-		float sampledDepth = shadowMap.Sample(SamplerShadow, shadowPosition.xy).r + 0.0001;
-		if (pixelDepth > sampledDepth) {
-			litColor = (ambient) * diffuseColor + (specular * specularColor);
-		}
+		float sum = 0;
+		float x, y;
+
+		for (y = -1.5; y <= 1.5; y += 1.0)
+			for (x = -1.5; x <= 1.5; x += 1.0) {
+				float sampledDepth = shadowMap.Sample(SamplerShadow, shadowPosition.xy + float2(x, y) * shadowMapTexelSize).r + 0.0001;
+				if (pixelDepth > sampledDepth)
+					sum += 1.0f;
+			}
+		float shadowCoeff = 1.0 - sum / 16.0;
+		litColor = (diffuse * shadowCoeff + ambient) * diffuseColor + (specular * specularColor);
 	}
 
 	return litColor;

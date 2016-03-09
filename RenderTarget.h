@@ -12,7 +12,7 @@ public:
 
 	void BindTexture(unsigned index);
 	void UnbindTexture(unsigned index);
-
+	unsigned width, height;
 	ID3D11ShaderResourceView* shaderResourceView = nullptr;
 	ID3D11RenderTargetView* renderTargetView = nullptr;
 	ID3D11DepthStencilView* depthStencilView = nullptr;

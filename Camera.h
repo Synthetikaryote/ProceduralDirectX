@@ -17,7 +17,7 @@ public:
 	Camera(float fieldOfView, float aspect, float nearPlane, float farPlane);
 	~Camera();
 
-	XMFLOAT3 position, rotation, up, forward, velocity;
+	XMFLOAT3 position, rotation, velocity;
 	float yaw, pitch;
 	bool yawPitchPosDirty = true;
 	XMFLOAT3 sensitivity;

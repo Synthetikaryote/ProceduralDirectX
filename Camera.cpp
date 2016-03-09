@@ -6,8 +6,6 @@
 Camera::Camera(float fieldOfView, float aspect, float nearPlane, float farPlane) {
 	position = { 0.f, 0.f, -3.f };
 	rotation = { 0.f, 0.f, 0.f };
-	up = { 0.f, 1.f, 0.f };
-	forward = { 0.f, 0.f, 1.f };
 	velocity = { 0.f, 0.f, 0.f };
 	yaw = 0.f;
 	pitch = 0.f;
@@ -139,8 +137,8 @@ bool Camera::Update(float elapsed) {
 }
 
 void Camera::UpdateState() {
-	XMVECTOR upVector = XMLoadFloat3(&up);
-	XMVECTOR forwardVector = XMLoadFloat3(&forward);
+	XMVECTOR upVector = XMLoadFloat3(&worldUp);
+	XMVECTOR forwardVector = XMLoadFloat3(&worldForward);
 	XMVECTOR positionVector = XMLoadFloat3(&position);
 	XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(pitch, yaw, 0.f);
 	// rotate the forward and up according to the camera rotation

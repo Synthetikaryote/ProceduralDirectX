@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d11_2.h>
+#include <directxmath.h>
 #include <comdef.h>
 #include <chrono>
 #include <vector>
@@ -11,11 +12,14 @@ class Camera;
 class DepthStencilState;
 using namespace std;
 using namespace Microsoft::WRL;
+using namespace DirectX;
 
 // constants
 const float PI = 3.14159265358979f;
 const float TWOPI = 2.f * PI;
 const float HALFPI = 0.5f * PI;
+XMFLOAT3 const worldUp = {0.0f, 1.0f, 0.0f};
+XMFLOAT3 const worldForward = {0.0f, 0.0f, 1.0f};
 
 // global functions
 

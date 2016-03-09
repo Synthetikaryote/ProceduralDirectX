@@ -22,6 +22,7 @@ cbuffer LightingBuffer : register(b2) {
     float4 lightDiffuse;
     float4 lightSpecular;
 	matrix shadowMatrix;
+	float2 shadowMapTexelSize;
 };
 
 // typedefs

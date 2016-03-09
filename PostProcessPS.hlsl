@@ -74,8 +74,8 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 
 	if (flags == 2) {
 		float depth = color.r;
-		float near = 0.00001f;
-		float far = 1000.0f;
+		float near = 0.01f;
+		float far = 100.0f;
 		float linearDepth = (2.0f * near) / (far + near - depth * (far - near));
 		color = linearDepth;
 	}

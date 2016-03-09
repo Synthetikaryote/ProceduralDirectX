@@ -8,6 +8,8 @@ RenderTarget::RenderTarget(unsigned width, unsigned height, DXGI_FORMAT colorFor
 	// create the depth stencil buffer
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
+	this->width = width;
+	this->height = height;
 	desc.Width = width;
 	desc.Height = height;
 	desc.MipLevels = 1;

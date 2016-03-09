@@ -405,11 +405,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	Uber::I().camera->SetFocus(world);
 
 	// camera for shadows
-	Uber::I().lightCamera = new Camera(PI / 2.0f, 1.0f, 0.00001f, 1000.0f);
+	Uber::I().lightCamera = new Camera(PI / 2.0f, 1.0f, 0.01f, 100.0f);
 	Uber::I().lightCamera->position = XMFLOAT3(-2.0f, 0.0f, -2.0f);
 	Uber::I().lightCamera->yaw = PI * 0.25f;
 	Uber::I().lightCamera->Update(0.0f);
-	RenderTarget depthMap(1024, 1024, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
+	RenderTarget depthMap(4096, 4096, DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
 	// shader for shadows
 	Shader* depthMapShader = Shader::LoadShader("DepthMapVS.cso", "", {{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}, {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}}, samplerDesc);
 	depthMapShader->vertexShaderConstantBuffers = {depthMapBuffer.buffer};
@@ -421,7 +421,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.5f, 0.5f, 0.0f, 1.0f
 	);
-	vector<Model*> shadowCasters = {duck, world};
+	vector<Model*> shadowCasters = {duck};
 	// add the depthMap to the world bindings
 	Texture* depthMapTexture = new Texture();
 	depthMapTexture->shaderResourceView = depthMap.shaderResourceView;
@@ -572,7 +572,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			RaycastResult bottomMiddle = Uber::I().camera->ScreenRaycastToModelSphere(world, static_cast<int>(Uber::I().windowWidth) / 2, static_cast<int>(Uber::I().windowHeight));
 			if (topLeft.didHit && topMiddle.didHit && topRight.didHit && bottomLeft.didHit && bottomMiddle.didHit && bottomRight.didHit) {
 				auto& tl = topLeft.hitLocation, tm = topMiddle.hitLocation, tr = topRight.hitLocation, bl = bottomLeft.hitLocation, bm = bottomMiddle.hitLocation, br = bottomRight.hitLocation;
-				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+				XMVECTOR upVector = XMLoadFloat3(&worldUp);
 				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 				XMMATRIX worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				XMMATRIX inverseWorld = XMMatrixInverse(nullptr, worldMatrix);
@@ -608,10 +608,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				else {
 					auto GetYaw = [](XMFLOAT4& p) -> float {
 						float yaw = atan2(p.z, p.x);
-						if (yaw < 0.0f) yaw += TWOPI;
 						return yaw;
 					};
 					yawMin = min(GetYaw(tl), GetYaw(bl));
+					if (yawMin < 0.0f) yawMin += TWOPI;
 					yawMax = max(GetYaw(br), GetYaw(tr));
 					if (yawMax < 0.0f) yawMax += TWOPI;
 					pitchMin = min(min(atan2(-tl.y, sqrtf(tl.x * tl.x + tl.z * tl.z)) + HALFPI,
@@ -649,7 +649,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			// hold left click to use tool
 			if (Uber::I().mouseState.rgbButtons[0]) {
-				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+				XMVECTOR upVector = XMLoadFloat3(&worldUp);
 				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 				XMMATRIX worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 				XMMATRIX inverseWorld = XMMatrixInverse(nullptr, worldMatrix);
@@ -759,7 +759,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		for (auto* model : models) {
 			// add rotation to the sphere
 			if (Uber::I().camera->focus && model == Uber::I().camera->focus) {
-				XMVECTOR upVector = XMLoadFloat3(&Uber::I().camera->up);
+				XMVECTOR upVector = XMLoadFloat3(&worldUp);
 				XMVECTOR rightVector = XMLoadFloat3(&XMFLOAT3(1.0f, 0.0f, 0.0f));
 				worldMatrix = XMMatrixRotationAxis(upVector, Uber::I().camera->focusYaw) * XMMatrixRotationAxis(rightVector, -Uber::I().camera->focusPitch);
 			}
@@ -787,7 +787,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			XMMATRIX lightViewMatrix = XMLoadFloat4x4(&Uber::I().lightCamera->view);
 			XMMATRIX lightProjectionMatrix = XMLoadFloat4x4(&Uber::I().lightCamera->proj);
 			// to do:  something's wrong with this
-			lightingBuffer.data.shadowMatrix = worldMatrix * lightViewMatrix * lightProjectionMatrix * XMLoadFloat4x4(&matNDCtoUV);
+			lightingBuffer.data.shadowMatrix = XMMatrixTranspose(worldMatrix * lightViewMatrix * lightProjectionMatrix * XMLoadFloat4x4(&matNDCtoUV));
+			lightingBuffer.data.shadowMapTexelSize = XMFLOAT2(1.0f / depthMap.width, 1.0f / depthMap.height);
 			lightingBuffer.UpdateSubresource();
 
 			for (auto* mesh : model->meshes) {
