@@ -283,10 +283,12 @@ Mesh* GeneratePartialSphereNoBuffers(unsigned longitudes, unsigned latitudes, fl
 		for (unsigned lon = 0; lon <= longitudes; ++lon) {
 			const float alat = pitchMin + lat * latStep;
 			const float alon = yawMin + lon * lonStep;
-			mesh->vertices[v].position = XMFLOAT4(sinf(alat) * cosf(alon), cosf(alat), sinf(alat) * sinf(alon), 1.0f);
+			float height = GetHeight(alon, alat);
+			mesh->vertices[v].position = XMFLOAT4(sinf(alat) * cosf(alon) * height, cosf(alat) * height, sinf(alat) * sinf(alon) * height, 1.0f);
 			mesh->vertices[v].normal = mesh->vertices[v].position;
 			mesh->vertices[v].normal.w = 0.0f;
-			mesh->vertices[v].tangent = XMFLOAT4(sinf(alat) * cosf(alon + lonStep) - sinf(alat) * cosf(alon), 0.0f, sinf(alat) * sinf(alon + lonStep) - sinf(alat) * sinf(alon), 0.0f);
+			float height2 = GetHeight(alon + lonStep, alat);
+			mesh->vertices[v].tangent = XMFLOAT4(sinf(alat) * cosf(alon + lonStep) * height2 - sinf(alat) * cosf(alon) * height, 0.0f, sinf(alat) * sinf(alon + lonStep) * height2 - sinf(alat) * sinf(alon) * height, 0.0f);
 			mesh->vertices[v++].texture = XMFLOAT3(alon / TWOPI, alat / PI, 0.0f);
 		}
 	}

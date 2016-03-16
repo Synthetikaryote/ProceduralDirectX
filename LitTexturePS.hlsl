@@ -4,6 +4,7 @@ TextureCube cubeTexture : register(t1);
 Texture2D spec : register(t2);
 Texture2D normalMap : register(t3);
 Texture2D shadowMap : register(t4);
+Texture2D heightMap : register(t5);
 SamplerState SampleType : register(s0);
 SamplerState SamplerShadow : register(s1);
 
@@ -14,6 +15,7 @@ cbuffer MaterialBuffer : register(b0) {
     uint vsSlotsUsed;
     uint psSlotsUsed;
 	uint psFlags;
+	float time;
 };
 cbuffer LightingBuffer : register(b1) {
     float4 viewPosition;
@@ -57,8 +59,9 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
 
 	// specular
     float specularColor = 0.0f;
-    if (psSlotsUsed & 1 << 2)
-        specularColor = spec.Sample(SampleType, input.tex.xy).x;
+	if (psSlotsUsed & 1 << 2) {
+		specularColor = spec.Sample(SampleType, input.tex.xy).x;
+	}
 
     float3 dirToLight = normalize(input.dirToLight);
     float3 dirToView = normalize(input.dirToView);
@@ -74,6 +77,27 @@ float4 main(VertexShaderOutput input) : SV_TARGET {
         normalSample = (normalSample * 2.0f) - 1.0f;
         bumpNormal = normalize((normalSample.x * tangent) + (normalSample.y * binormal) + (normalSample.z * normal));
     }
+
+	// height map effect
+	if (psSlotsUsed & 1 << 5) {
+		float height = 0.38f - heightMap.Sample(SampleType, input.tex.xy).x;
+		if (height > sin(time * 0.01f * 3.14159f * 2.0f + 0.4f * 3.14159f) * 0.385f || specularColor > 0.3f) {
+			float s = 2.0f;
+			float2 noise = (frac(sin(dot(input.tex.xy, float2(12.9898, 78.233)*2.0)) * 43758.5453));
+				float rand = abs(noise.x + noise.y) * 0.5;
+			float randR = sin(input.tex.x) * 0.5f + 0.5f;
+			float randG = cos(input.tex.y) * 0.5f + 0.5f;
+			float randB = saturate(randR + randG);
+			float lit = saturate(((cos(input.tex.x) * 0.5f + 0.5f) * (sin(input.tex.y) * 0.5f + 0.5f)) * rand);
+			diffuseColor = float4(0.3f, 0.6f, 0.8f, 1.0f);
+			bumpNormal = normal;
+			specularColor = 1.0f;
+			if (rand > 0.995f) {
+				float i = abs(sin((time / s + 0.5f + input.tex.x * 6.28 * 100 + input.tex.y * 6.28 * 50) * 3.14));
+				diffuseColor = float4(0.3f + 0.7f * i, 0.6f + 0.4f * i, 0.8f + 0.2f * i, 1.0f);
+			}
+		}
+	}
 
     float d = saturate(dot(dirToLight, bumpNormal));
 	if (psFlags & 1) {

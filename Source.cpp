@@ -297,6 +297,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// create the world matrix
 	XMMATRIX worldMatrix = XMMatrixIdentity();
 
+	// heights
+	for (float& height : Uber::I().heights) {
+		height = 1.0f;
+	}
+
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
 
@@ -377,7 +382,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	TextureBinding diffuseBinding = { diffuseTexture, ShaderTypePixel, diffuseTexture->isTextureCube ? 1 : 0 };
 	TextureBinding specularBinding = { specularTexture, ShaderTypePixel, 2 };
 	TextureBinding normalBinding = { normalTexture, ShaderTypePixel, 3 };
-	worldMesh->textureBindings = { heightBinding, diffuseBinding, specularBinding, normalBinding };
+	TextureBinding heightBindingPS = {heightTexture, ShaderTypePixel, 5};
+	//heightTexture->AddRef();
+	worldMesh->textureBindings = { heightBinding, diffuseBinding, specularBinding, normalBinding/*, heightBindingPS*/ };
 	worldMesh->depthMapTextureBindings = {heightBinding};
 	worldMesh->shader = litTexture;
 	world->meshes.push_back(worldMesh);
@@ -463,6 +470,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	mouse->Acquire();
 
 	Uber::I().context->OMSetRenderTargets(1, &Uber::I().renderTargetView, Uber::I().depthStencilView);
+
 
 	float raiseDir = 1.0f;
 	float flattenHeight = 0.0f;
@@ -692,10 +700,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 						float raiseDir2 = raiseDir != 0.0f ? raiseDir : (diff > 0.0f ? -1.0f : 1.0f);
 						float ratio = raiseDir2 >= 0.0f ? mostExtremeMin / vDistSq : vDistSq / mostExtremeMax;
 						float dist2 = dist * raiseDir2 * ratio * ratio;
+						float yaw = atan2(p.z, p.x);
+						float pitch = atan2(-p.y, sqrtf(p.x * p.x + p.z * p.z)) + HALFPI;
 						if (flattenHeight != 0.0f && abs(diff) < abs(dist2)) {
+							GetHeight(yaw, pitch) = flattenHeight;
 							p.x = n.x * flattenHeight; p.y = n.y * flattenHeight; p.z = n.z * flattenHeight;
 						}
 						else {
+							GetHeight(yaw, pitch) += dist2;
 							p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
 						}
 					}
@@ -793,6 +805,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			lightingBuffer.data.shadowMatrix = XMMatrixTranspose(worldMatrix * lightViewMatrix * lightProjectionMatrix * XMLoadFloat4x4(&matNDCtoUV));
 			lightingBuffer.data.shadowMapTexelSize = XMFLOAT2(1.0f / depthMap.width, 1.0f / depthMap.height);
 			lightingBuffer.UpdateSubresource();
+
+			materialBuffer.data.time = time();
 
 			for (auto* mesh : model->meshes) {
 

@@ -79,10 +79,9 @@ void GetTextureData(const string& path, unsigned char*& data, unsigned& w, unsig
 		default:
 			format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	}
-	// targas need to be flipped upside down
-	if (imageFormat == FIF_TARGA || imageFormat == FIF_JPEG) {
-		FreeImage_FlipVertical(imageData);
-	}
+	// images need to be flipped upside down
+	FreeImage_FlipVertical(imageData);
+
 	// make sure it's in the right byte order and size
 	if (bpp > 8 && bpp != 32) {
 		FIBITMAP* temp = imageData;

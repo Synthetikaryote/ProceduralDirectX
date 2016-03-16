@@ -14,6 +14,7 @@ cbuffer MaterialBuffer : register(b1) {
     uint vsSlotsUsed;
     uint psSlotsUsed;
 	uint psFlags;
+	float time;
 };
 cbuffer LightingBuffer : register(b2) {
     float4 viewPosition;

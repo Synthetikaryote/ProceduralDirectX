@@ -15,6 +15,7 @@
     <ClCompile Include="RenderTarget.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="DepthStencilState.cpp" />
+    <ClCompile Include="HeightTree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LitTexturePS.hlsl">
@@ -47,6 +48,7 @@
     <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="DepthStencilState.h" />
+    <ClInclude Include="HeightTree.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shaders">

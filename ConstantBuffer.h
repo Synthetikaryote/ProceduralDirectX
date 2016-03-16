@@ -16,6 +16,7 @@ struct MaterialBufferType {
 	unsigned vsSlotsUsed;
 	unsigned psSlotsUsed;
 	unsigned psFlags;
+	float time;
 };
 struct LightingBufferType {
 	XMFLOAT4 viewPosition;
