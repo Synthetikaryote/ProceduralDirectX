@@ -299,7 +299,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMMATRIX worldMatrix = XMMatrixIdentity();
 
 	// heights
-	unsigned meshSize = 64;
+	unsigned meshSize = 32;
 	Uber::I().zoomStep = 8;
 	Uber::I().heights = new HeightTree();
 	Uber::I().heights->height = 1.0f;

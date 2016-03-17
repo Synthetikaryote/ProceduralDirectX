@@ -21,7 +21,7 @@ const float TWOPI = 2.f * PI;
 const float HALFPI = 0.5f * PI;
 XMFLOAT3 const worldUp = {0.0f, 1.0f, 0.0f};
 XMFLOAT3 const worldForward = {0.0f, 0.0f, 1.0f};
-const unsigned heightSMax = 1024;
+const unsigned heightSMax = pow(2, 10);
 
 
 // global functions
