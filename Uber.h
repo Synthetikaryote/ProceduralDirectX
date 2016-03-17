@@ -10,6 +10,7 @@
 class ResourceManager;
 class Camera;
 class DepthStencilState;
+class HeightTree;
 using namespace std;
 using namespace Microsoft::WRL;
 using namespace DirectX;
@@ -20,8 +21,7 @@ const float TWOPI = 2.f * PI;
 const float HALFPI = 0.5f * PI;
 XMFLOAT3 const worldUp = {0.0f, 1.0f, 0.0f};
 XMFLOAT3 const worldForward = {0.0f, 0.0f, 1.0f};
-const unsigned heightXMax = 16384;
-const unsigned heightYMax = 8196;
+const unsigned heightSMax = 1024;
 
 
 // global functions
@@ -42,8 +42,8 @@ inline void hash_combine(size_t& seed, const T& v) {
 }
 
 bool IsKeyDown(unsigned char);
-float& GetHeight(float yaw, float pitch);
-//void SetHeight(float yaw, float pitch, float value);
+float GetHeight(float yaw, float pitch);
+void SetHeight(float yaw, float pitch, float value);
 
 // singleton pattern from http://stackoverflow.com/questions/1008019/c-singleton-design-pattern
 class Uber {
@@ -60,7 +60,8 @@ public:
 	Uber(Uber const&) = delete;
 	void operator=(Uber const&) = delete;
 
-	float heights[heightYMax * heightXMax];
+	HeightTree* heights;
+	unsigned zoomStep = 1;
 	HWND hWnd;
 	WNDCLASSEX wc;
 	ComPtr<ID3D11Device> device;

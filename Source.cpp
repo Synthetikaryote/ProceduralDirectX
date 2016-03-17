@@ -29,6 +29,7 @@
 #include "RenderTarget.h"
 #include "Transform.h"
 #include "DepthStencilState.h"
+#include "HeightTree.h"
 
 // text rendering
 #include <d2d1_2.h>
@@ -298,9 +299,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	XMMATRIX worldMatrix = XMMatrixIdentity();
 
 	// heights
-	for (float& height : Uber::I().heights) {
-		height = 1.0f;
-	}
+	unsigned meshSize = 64;
+	Uber::I().zoomStep = 8;
+	Uber::I().heights = new HeightTree();
+	Uber::I().heights->height = 1.0f;
+	Uber::I().heights->s = heightSMax;
 
 	// create the resource manager
 	Uber::I().resourceManager = new ResourceManager();
@@ -372,7 +375,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//}
 	//Mesh* world = Mesh::LoadCubeSphere(20);
 	Model* world = new Model();
-	Mesh* worldMesh = Mesh::LoadPartialSphere(128, 64, PI * 0.25f, PI * 0.75f, PI * 0.25f, PI * 0.75f, D3D11_CPU_ACCESS_WRITE);
+	Mesh* worldMesh = Mesh::LoadPartialSphere(meshSize, meshSize, 0.0f, TWOPI, 0.0f, PI, D3D11_CPU_ACCESS_WRITE);
 	//Texture* diffuseTexture = Texture::LoadCube(paths);
 	Texture* heightTexture = Texture::Load(string("8081-earthbump4k.jpg"));
 	Texture* diffuseTexture = Texture::Load(string("8081-earthmap4k.jpg"));
@@ -633,17 +636,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 						atan2(-bl.y, sqrtf(bl.x * bl.x + bl.z * bl.z)) + HALFPI);
 				}
 				// round the bounds to the nearest grid point
-				float gridX = 128.0f; //diffuseTexture->w;
-				float gridY = 64.0f; //diffuseTexture->h;
-				yawMin = floor(yawMin * gridX) / gridX;
-				yawMax = ceil(yawMax * gridX) / gridX;
-				pitchMin = floor(pitchMin * gridY) / gridY;
-				pitchMax = ceil(pitchMax * gridY) / gridY;
-				worldMesh->UpdatePartialSphere(64, 32, yawMin, yawMax, pitchMin, pitchMax);
-				swprintf_s(message, L"yaw: %.4f-%.4f  pitch: %.4f-%.4f", yawMin, yawMax, pitchMin, pitchMax);
+				float screenStepF = abs(yawMax - yawMin) / TWOPI * heightSMax;
+				unsigned screenStep = max(1, pow(2, ceil(log(screenStepF) / log(2))));
+				float stepF = abs(yawMax - yawMin) / TWOPI / meshSize * heightSMax;
+				unsigned step = max(1, pow(2, ceil(log(stepF) / log(2))));
+				unsigned gridYawMin = floor(yawMin / TWOPI * heightSMax / screenStep) * screenStep;
+				unsigned gridYawMax = gridYawMin + meshSize * step;
+				yawMin = static_cast<float>(gridYawMin) / heightSMax * TWOPI;
+				yawMax = min(TWOPI, static_cast<float>(gridYawMax) / heightSMax * TWOPI);
+				unsigned gridPitchMin = floor(pitchMin / PI  * heightSMax / screenStep) * screenStep;
+				unsigned gridPitchMax = gridPitchMin + meshSize * step;
+				pitchMin = static_cast<float>(gridPitchMin) / heightSMax * PI;
+				pitchMax = min(PI, static_cast<float>(gridPitchMax) / heightSMax * PI);
+				Uber::I().zoomStep = step;
+				worldMesh->UpdatePartialSphere(meshSize - 1, meshSize - 1, yawMin, yawMax, pitchMin, pitchMax);
+				swprintf_s(message, L"yaw: %.4f-%.4f  pitch: %.4f-%.4f  screenStep: %u  step: %u", yawMin, yawMax, pitchMin, pitchMax, screenStep, step);
 			}
 			else {
-				worldMesh->UpdatePartialSphere(64, 32, 0.0f, TWOPI, 0.0f, PI);
+				worldMesh->UpdatePartialSphere(meshSize - 1, meshSize - 1, 0.0f, TWOPI, 0.0f, PI);
 				swprintf_s(message, L"full sphere");
 			}
 		}
@@ -703,11 +713,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 						float yaw = atan2(p.z, p.x);
 						float pitch = atan2(-p.y, sqrtf(p.x * p.x + p.z * p.z)) + HALFPI;
 						if (flattenHeight != 0.0f && abs(diff) < abs(dist2)) {
-							GetHeight(yaw, pitch) = flattenHeight;
+							SetHeight(yaw, pitch, flattenHeight);
 							p.x = n.x * flattenHeight; p.y = n.y * flattenHeight; p.z = n.z * flattenHeight;
 						}
 						else {
-							GetHeight(yaw, pitch) += dist2;
+							SetHeight(yaw, pitch, GetHeight(yaw, pitch) + dist2);
 							p.x += n.x * dist2; p.y += n.y * dist2; p.z += n.z * dist2;
 						}
 					}

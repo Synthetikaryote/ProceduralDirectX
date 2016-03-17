@@ -3,6 +3,7 @@
 #include <vector>
 #include <fstream>
 #include "Shlwapi.h"
+#include "HeightTree.h"
 using namespace std;
 
 void ThrowIfFailed(HRESULT hr) {
@@ -44,12 +45,22 @@ bool IsKeyDown(unsigned char vk) {
 	return (Uber::I().keyboardState[vk] & 0x80) ? true : false;
 }
 
-float& GetHeight(float yaw, float pitch) {
+float GetHeight(float yaw, float pitch) {
 	while (yaw < 0.0f) yaw += TWOPI;
 	while (yaw >= TWOPI) yaw -= TWOPI;
 	if (pitch < 0.0f) pitch = 0.0f;
 	if (pitch > PI) pitch = PI;
-	unsigned x = static_cast<unsigned>(yaw / TWOPI * (heightXMax - 1));
-	unsigned y = static_cast<unsigned>(pitch / PI * (heightYMax - 1));
-	return Uber::I().heights[y * heightYMax + x];
+	unsigned x = static_cast<unsigned>(yaw / TWOPI * heightSMax) % heightSMax;
+	unsigned y = static_cast<unsigned>(pitch / PI * heightSMax) % heightSMax;
+	return Uber::I().heights->GetHeight(x, y, Uber::I().zoomStep);
+}
+
+void SetHeight(float yaw, float pitch, float value) {
+	while (yaw < 0.0f) yaw += TWOPI;
+	while (yaw >= TWOPI) yaw -= TWOPI;
+	if (pitch < 0.0f) pitch = 0.0f;
+	if (pitch > PI) pitch = PI;
+	unsigned x = static_cast<unsigned>(yaw / TWOPI * heightSMax) % heightSMax;
+	unsigned y = static_cast<unsigned>(pitch / PI * heightSMax) % heightSMax;
+	return Uber::I().heights->SetHeight(x, y, Uber::I().zoomStep, value);
 }
